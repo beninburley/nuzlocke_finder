@@ -961,34 +961,240 @@ function simulateTurn(state, yourAction, enemyAction) {
  */
 function handleForcedSwitch(state, isPlayer) {
   const team = isPlayer ? state.yourTeam : state.enemyTeam;
-  const currentIndex = isPlayer ? state.yourActiveIndex : state.enemyActiveIndex;
-  
-  // Find first non-fainted Pokemon
+  const currentIndex = isPlayer
+    ? state.yourActiveIndex
+    : state.enemyActiveIndex;
+  const opponent = isPlayer ? state.getEnemyActive() : state.getYourActive();
+
   let nextIndex = -1;
-  for (let i = 0; i < team.length; i++) {
-    if (i !== currentIndex && !team[i].fainted) {
-      nextIndex = i;
-      break;
+
+  if (isPlayer) {
+    // Player: just find first non-fainted Pokemon
+    for (let i = 0; i < team.length; i++) {
+      if (i !== currentIndex && !team[i].fainted) {
+        nextIndex = i;
+        break;
+      }
     }
+  } else {
+    // Enemy: use switch-in scoring to pick best matchup
+    const bestSwitch = findBestSwitchIn(team, currentIndex, opponent);
+    nextIndex = bestSwitch.index;
   }
-  
+
   if (nextIndex === -1) {
     return null; // No Pokemon available
   }
-  
+
   // Update active index
   if (isPlayer) {
     state.yourActiveIndex = nextIndex;
   } else {
     state.enemyActiveIndex = nextIndex;
   }
-  
+
   return {
-    type: 'switch',
+    type: "switch",
     isPlayer: isPlayer,
     pokemon: team[nextIndex],
-    text: `${isPlayer ? 'You' : 'Enemy'} sent out ${capitalize(team[nextIndex].name)}!`
+    text: `${isPlayer ? "You" : "Enemy"} sent out ${capitalize(
+      team[nextIndex].name
+    )}!`,
   };
+}
+
+// ============================================================================
+// POSITION EVALUATION & RISK ASSESSMENT
+// ============================================================================
+
+/**
+ * Evaluate a battle position
+ * Returns a score where positive = good for player, negative = good for enemy
+ * @param {BattleState} state - Battle state to evaluate
+ * @returns {number} - Position score
+ */
+function evaluatePosition(state) {
+  let score = 0;
+
+  // Count alive Pokemon
+  const yourAlive = state.yourTeam.filter((p) => !p.fainted).length;
+  const enemyAlive = state.enemyTeam.filter((p) => !p.fainted).length;
+
+  // Heavy weight on Pokemon count (winning condition)
+  score += (yourAlive - enemyAlive) * 1000;
+
+  // Calculate total HP percentage
+  let yourTotalHP = 0;
+  let yourMaxHP = 0;
+  let enemyTotalHP = 0;
+  let enemyMaxHP = 0;
+
+  state.yourTeam.forEach((p) => {
+    yourTotalHP += p.currentHP;
+    yourMaxHP += p.stats.hp;
+  });
+
+  state.enemyTeam.forEach((p) => {
+    enemyTotalHP += p.currentHP;
+    enemyMaxHP += p.stats.hp;
+  });
+
+  const yourHPPercent = yourMaxHP > 0 ? yourTotalHP / yourMaxHP : 0;
+  const enemyHPPercent = enemyMaxHP > 0 ? enemyTotalHP / enemyMaxHP : 0;
+
+  // Weight HP advantage
+  score += (yourHPPercent - enemyHPPercent) * 200;
+
+  // Evaluate current matchup
+  if (yourAlive > 0 && enemyAlive > 0) {
+    const yourActive = state.getYourActive();
+    const enemyActive = state.getEnemyActive();
+
+    if (!yourActive.fainted && !enemyActive.fainted) {
+      const matchupScore = calculateSwitchInScore(yourActive, enemyActive);
+      score += matchupScore * 50;
+    }
+  }
+
+  return score;
+}
+
+/**
+ * Calculate risk for a specific action
+ * @param {BattleState} state - Current state
+ * @param {Object} action - Action to evaluate
+ * @param {boolean} isPlayer - True if player action
+ * @returns {Object} - Risk analysis {level, reasons, probability}
+ */
+function calculateActionRisk(state, action, isPlayer) {
+  const risks = [];
+  let riskScore = 0;
+
+  const attacker = isPlayer ? state.getYourActive() : state.getEnemyActive();
+  const defender = isPlayer ? state.getEnemyActive() : state.getYourActive();
+
+  if (action.type === "move" && action.move.damageClass !== "status") {
+    // Calculate damage ranges
+    const attackerStats = attacker.stats;
+    const defenderStats = defender.stats;
+    const damage = calculateDamage(
+      attacker,
+      defender,
+      action.move,
+      attackerStats,
+      defenderStats
+    );
+
+    // Check if we can get OHKO'd back
+    if (defender.moveData) {
+      let maxRetaliation = 0;
+      defender.moveData.forEach((move) => {
+        if (move.damageClass !== "status") {
+          const retDamage = calculateDamage(
+            defender,
+            attacker,
+            move,
+            defenderStats,
+            attackerStats
+          );
+          maxRetaliation = Math.max(maxRetaliation, retDamage.max);
+        }
+      });
+
+      if (maxRetaliation >= attacker.currentHP) {
+        risks.push("OHKO risk from counter-attack");
+        riskScore += 3;
+      } else if (maxRetaliation * 2 >= attacker.currentHP) {
+        risks.push("2HKO risk from counter-attack");
+        riskScore += 2;
+      }
+    }
+
+    // Check for kill reliability
+    const minDamageKills = damage.min >= defender.currentHP;
+    const maxDamageKills = damage.max >= defender.currentHP;
+
+    if (maxDamageKills && !minDamageKills) {
+      risks.push("Kill depends on damage roll");
+      riskScore += 1;
+    }
+
+    // Check type effectiveness
+    if (damage.effectiveness < 1 && damage.effectiveness > 0) {
+      risks.push("Resisted attack");
+      riskScore += 1;
+    } else if (damage.effectiveness === 0) {
+      risks.push("Immune to attack");
+      riskScore += 5;
+    }
+
+    // Check speed (if defender is faster, they hit first)
+    if (defenderStats.spe > attackerStats.spe && !minDamageKills) {
+      risks.push("Opponent moves first");
+      riskScore += 1;
+    }
+  } else if (action.type === "switch") {
+    // Switching gives opponent a free hit
+    const switchIn = action.pokemon;
+
+    if (defender.moveData) {
+      let maxDamage = 0;
+      defender.moveData.forEach((move) => {
+        if (move.damageClass !== "status") {
+          const damage = calculateDamage(
+            defender,
+            switchIn,
+            move,
+            defender.stats,
+            switchIn.stats
+          );
+          maxDamage = Math.max(maxDamage, damage.max);
+        }
+      });
+
+      if (maxDamage >= switchIn.currentHP) {
+        risks.push("Switch-in can be OHKO'd");
+        riskScore += 4;
+      } else if (maxDamage * 2 >= switchIn.currentHP) {
+        risks.push("Switch-in can be 2HKO'd");
+        riskScore += 2;
+      }
+    }
+
+    risks.push("Free attack for opponent");
+    riskScore += 1;
+  }
+
+  // Determine risk level
+  let level = "low";
+  if (riskScore >= 5) level = "high";
+  else if (riskScore >= 3) level = "medium";
+
+  return {
+    level: level,
+    reasons: risks,
+    score: riskScore,
+    probability: Math.max(0, 1 - riskScore * 0.15), // Rough success probability
+  };
+}
+
+/**
+ * Calculate damage roll probabilities
+ * @param {number} minDamage - Minimum damage
+ * @param {number} maxDamage - Maximum damage
+ * @param {number} threshold - HP threshold to check
+ * @returns {number} - Probability of exceeding threshold (0-1)
+ */
+function calculateKillProbability(minDamage, maxDamage, threshold) {
+  if (minDamage >= threshold) return 1.0; // Always kills
+  if (maxDamage < threshold) return 0.0; // Never kills
+
+  // Linear approximation of damage roll distribution
+  // Damage rolls are uniform between min and max
+  const killRange = maxDamage - threshold;
+  const totalRange = maxDamage - minDamage;
+
+  return killRange / totalRange;
 }
 
 // ============================================================================
@@ -1119,6 +1325,217 @@ function displayStrategyResults(timeline, analysis) {
 }
 
 // ============================================================================
+// LOOKAHEAD & STRATEGY OPTIMIZATION
+// ============================================================================
+
+/**
+ * Find best action using lookahead
+ * @param {BattleState} state - Current state
+ * @param {boolean} isPlayer - True if finding action for player
+ * @param {number} depth - Lookahead depth (turns)
+ * @returns {Object} - Best action with score
+ */
+function findBestActionWithLookahead(state, isPlayer, depth = 2) {
+  if (depth === 0) {
+    return { action: null, score: evaluatePosition(state) };
+  }
+
+  const actions = generatePossibleActions(state, isPlayer);
+  if (actions.length === 0) {
+    return { action: null, score: evaluatePosition(state) };
+  }
+
+  let bestAction = actions[0];
+  let bestScore = isPlayer ? -Infinity : Infinity;
+
+  actions.forEach((action) => {
+    // Simulate this action
+    const opponent = isPlayer ? state.getEnemyActive() : state.getYourActive();
+
+    // For simplicity, assume opponent does their best move
+    const opponentActions = generatePossibleActions(state, !isPlayer);
+    if (opponentActions.length === 0) return;
+
+    // Pick opponent's best move (greedy for now to keep it fast)
+    let opponentAction = opponentActions[0];
+    if (opponentActions.length > 0) {
+      opponentAction =
+        opponentActions.reduce((best, current) => {
+          if (
+            current.type === "move" &&
+            current.move.damageClass !== "status"
+          ) {
+            const target = isPlayer
+              ? state.getYourActive()
+              : state.getEnemyActive();
+            const targetStats = target.stats;
+            const opponentStats = opponent.stats;
+            const damage = calculateDamage(
+              opponent,
+              target,
+              current.move,
+              opponentStats,
+              targetStats
+            );
+
+            if (!best || damage.average > 0) return current;
+          }
+          return best || current;
+        }, null) || opponentActions[0];
+    }
+
+    // Simulate the turn
+    const clonedState = state.clone();
+    const yourAction = isPlayer ? action : opponentAction;
+    const enemyAction = isPlayer ? opponentAction : action;
+
+    simulateTurn(clonedState, yourAction, enemyAction);
+
+    // Handle forced switches
+    if (clonedState.getYourActive().fainted) {
+      handleForcedSwitch(clonedState, true);
+    }
+    if (clonedState.getEnemyActive().fainted) {
+      handleForcedSwitch(clonedState, false);
+    }
+
+    // Recurse
+    const result = findBestActionWithLookahead(
+      clonedState,
+      isPlayer,
+      depth - 1
+    );
+    const score = result.score;
+
+    // Update best
+    if (isPlayer && score > bestScore) {
+      bestScore = score;
+      bestAction = action;
+    } else if (!isPlayer && score < bestScore) {
+      bestScore = score;
+      bestAction = action;
+    }
+  });
+
+  return { action: bestAction, score: bestScore };
+}
+
+/**
+ * Enemy AI: Select action based on simple heuristics (no lookahead)
+ * Uses switch-in scoring and highest damage move selection
+ * @param {BattleState} state - Current state
+ * @returns {Object} - Selected action
+ */
+function selectEnemyAction(state) {
+  const enemyActive = state.getEnemyActive();
+  const yourActive = state.getYourActive();
+  const actions = generatePossibleActions(state, false);
+
+  if (actions.length === 0) return null;
+
+  // Enemy NEVER switches voluntarily - only uses moves
+  // (Forced switches after fainting are handled separately by handleForcedSwitch)
+  const moveActions = actions.filter((a) => a.type === "move");
+
+  if (moveActions.length === 0) {
+    // No moves available (shouldn't happen in normal gameplay)
+    return null;
+  }
+
+  // Select move with highest average damage
+  let bestMove = moveActions[0];
+  let bestDamage = -1;
+
+  moveActions.forEach((action) => {
+    if (action.move.damageClass !== "status") {
+      const damage = calculateDamage(
+        enemyActive,
+        yourActive,
+        action.move,
+        enemyActive.stats,
+        yourActive.stats
+      );
+
+      if (damage.average > bestDamage) {
+        bestDamage = damage.average;
+        bestMove = action;
+      }
+    }
+  });
+
+  // If all moves are status moves, just use the first one
+  if (bestDamage === -1) {
+    return moveActions[0];
+  }
+
+  return bestMove;
+}
+
+/**
+ * Find optimal strategy path with minimal risk
+ * @param {BattleState} initialState - Starting state
+ * @param {number} maxDepth - Maximum turns to look ahead
+ * @returns {Array} - Array of {turn, action, risk} objects
+ */
+function findOptimalStrategy(initialState, maxDepth = 10) {
+  const strategy = [];
+  let currentState = initialState.clone();
+  let turnCount = 0;
+
+  while (turnCount < maxDepth) {
+    turnCount++;
+
+    // Check if battle is over
+    const yourAlive = currentState.yourTeam.filter((p) => !p.fainted).length;
+    const enemyAlive = currentState.enemyTeam.filter((p) => !p.fainted).length;
+
+    if (yourAlive === 0 || enemyAlive === 0) {
+      break;
+    }
+
+    // Player uses lookahead to find best action
+    const yourResult = findBestActionWithLookahead(currentState, true, 2);
+    const yourAction = yourResult.action;
+
+    if (!yourAction) break;
+
+    // Enemy uses simple AI (no lookahead, follows move selection rules)
+    const enemyAction = selectEnemyAction(currentState);
+
+    if (!enemyAction) break;
+
+    // Calculate risk for player action
+    const risk = calculateActionRisk(currentState, yourAction, true);
+
+    // Execute turn
+    const result = simulateTurn(currentState, yourAction, enemyAction);
+    currentState = result.state;
+
+    // Handle forced switches
+    if (currentState.getYourActive().fainted) {
+      const switchEvent = handleForcedSwitch(currentState, true);
+      if (switchEvent) result.events.push(switchEvent);
+    }
+
+    if (currentState.getEnemyActive().fainted) {
+      const switchEvent = handleForcedSwitch(currentState, false);
+      if (switchEvent) result.events.push(switchEvent);
+    }
+
+    // Add to strategy
+    strategy.push({
+      turn: currentState.turnCount,
+      action: yourAction,
+      events: result.events,
+      risk: risk,
+      state: currentState.clone(),
+    });
+  }
+
+  return strategy;
+}
+
+// ============================================================================
 // EVENT HANDLERS
 // ============================================================================
 
@@ -1165,160 +1582,39 @@ async function calculateStrategy() {
     // Display initial battle state
     displayBattleState(initialState);
 
-    // Step 4: Run basic battle simulation (greedy AI for now)
-    console.log("Running battle simulation...");
-    const timeline = [];
-    let currentState = initialState;
-    let maxTurns = 20; // Safety limit
+    // Step 4: Run optimized battle simulation with lookahead
+    console.log("Running optimized battle simulation with lookahead...");
 
-    while (maxTurns > 0) {
-      maxTurns--;
+    const strategy = findOptimalStrategy(initialState, 20);
 
-      // Check if battle is over
-      const yourAlive = currentState.yourTeam.filter((p) => !p.fainted).length;
-      const enemyAlive = currentState.enemyTeam.filter(
-        (p) => !p.fainted
-      ).length;
+    // Convert strategy to timeline format
+    const timeline = strategy.map((step) => {
+      const action = step.action;
+      const actionText =
+        action.type === "move"
+          ? `Use ${capitalize(action.move.name)}`
+          : `Switch to ${capitalize(action.pokemon.name)}`;
 
-      if (yourAlive === 0 || enemyAlive === 0) {
-        break; // Battle over
-      }
+      const riskReasons =
+        step.risk.reasons.length > 0
+          ? `<p><strong>Risks:</strong> ${step.risk.reasons.join(", ")}</p>`
+          : "";
 
-      // Generate possible actions
-      const yourActions = generatePossibleActions(currentState, true);
-      const enemyActions = generatePossibleActions(currentState, false);
-
-      if (yourActions.length === 0 || enemyActions.length === 0) {
-        break; // No actions available
-      }
-
-      // Simple AI: Choose best move or switch
-      let yourAction = yourActions[0]; // Default to first action
-      let enemyAction = enemyActions[0];
-
-      // Player AI: Find best switch if current matchup is bad
-      const yourActive = currentState.getYourActive();
-      const enemyActive = currentState.getEnemyActive();
-      const currentScore = calculateSwitchInScore(yourActive, enemyActive);
-
-      if (currentScore < 0) {
-        // Look for better switch
-        const bestSwitch = findBestSwitchIn(
-          currentState.yourTeam,
-          currentState.yourActiveIndex,
-          enemyActive
-        );
-        if (bestSwitch.score > currentScore) {
-          yourAction = yourActions.find(
-            (a) => a.type === "switch" && a.switchToIndex === bestSwitch.index
-          );
-        }
-      }
-
-      // If not switching, choose highest damage move
-      if (
-        yourAction.type === "move" &&
-        yourActions.filter((a) => a.type === "move").length > 0
-      ) {
-        let bestMove = yourActions.filter((a) => a.type === "move")[0];
-        let bestDamage = 0;
-
-        yourActions
-          .filter((a) => a.type === "move")
-          .forEach((action) => {
-            const damage = calculateDamage(
-              yourActive,
-              enemyActive,
-              action.move,
-              yourActive.stats,
-              enemyActive.stats
-            );
-            if (damage.average > bestDamage) {
-              bestDamage = damage.average;
-              bestMove = action;
-            }
-          });
-
-        yourAction = bestMove;
-      }
-
-      // Enemy AI: Similar logic
-      const enemyScore = calculateSwitchInScore(enemyActive, yourActive);
-
-      if (enemyScore < 0) {
-        const bestSwitch = findBestSwitchIn(
-          currentState.enemyTeam,
-          currentState.enemyActiveIndex,
-          yourActive
-        );
-        if (bestSwitch.score > enemyScore) {
-          enemyAction = enemyActions.find(
-            (a) => a.type === "switch" && a.switchToIndex === bestSwitch.index
-          );
-        }
-      }
-
-      if (
-        enemyAction.type === "move" &&
-        enemyActions.filter((a) => a.type === "move").length > 0
-      ) {
-        let bestMove = enemyActions.filter((a) => a.type === "move")[0];
-        let bestDamage = 0;
-
-        enemyActions
-          .filter((a) => a.type === "move")
-          .forEach((action) => {
-            const damage = calculateDamage(
-              enemyActive,
-              yourActive,
-              action.move,
-              enemyActive.stats,
-              yourActive.stats
-            );
-            if (damage.average > bestDamage) {
-              bestDamage = damage.average;
-              bestMove = action;
-            }
-          });
-
-        enemyAction = bestMove;
-      }
-
-      // Simulate turn
-      const result = simulateTurn(currentState, yourAction, enemyAction);
-      currentState = result.state;
-      
-      // Handle forced switches after faints
-      if (currentState.getYourActive().fainted) {
-        const switchEvent = handleForcedSwitch(currentState, true);
-        if (switchEvent) {
-          result.events.push(switchEvent);
-        }
-      }
-      
-      if (currentState.getEnemyActive().fainted) {
-        const switchEvent = handleForcedSwitch(currentState, false);
-        if (switchEvent) {
-          result.events.push(switchEvent);
-        }
-      }
-
-      // Add to timeline
-      const turnSummary = {
-        turn: currentState.turnCount,
-        action:
-          yourAction.type === "move"
-            ? `Use ${capitalize(yourAction.move.name)}`
-            : `Switch to ${capitalize(yourAction.pokemon.name)}`,
-        details: result.events.map((e) => `<p>${e.text}</p>`).join(""),
-        risk: "low", // TODO: Calculate actual risk
+      return {
+        turn: step.turn,
+        action: actionText,
+        details:
+          step.events.map((e) => `<p>${e.text}</p>`).join("") + riskReasons,
+        risk: step.risk.level,
       };
+    });
 
-      timeline.push(turnSummary);
+    // Get final state
+    const currentState =
+      strategy.length > 0 ? strategy[strategy.length - 1].state : initialState;
 
-      // Update battle display
-      displayBattleState(currentState);
-    }
+    // Display final battle state
+    displayBattleState(currentState);
 
     // Step 5: Analyze results
     const yourAlive = currentState.yourTeam.filter((p) => !p.fainted).length;
