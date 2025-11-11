@@ -43,8 +43,11 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
 
       <!-- Pokemon Box (Storage) -->
       <div class="box-section">
-        <h2>Pokemon Box (<span id="boxCount">0</span>/30)</h2>
-        <div id="pokemonBox" class="pokemon-box"></div>
+        <h2 class="collapsible-header" id="boxHeader">
+          <span class="collapse-icon">▼</span>
+          Pokemon Box (<span id="boxCount">0</span>/30)
+        </h2>
+        <div id="pokemonBox" class="pokemon-box collapsible-content"></div>
       </div>
 
       <!-- Team Section -->
@@ -74,6 +77,55 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
           <div class="team-slot" data-slot="5">
             <span class="slot-number">6</span>
             <span class="empty-text">Empty Slot</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enemy Team Section -->
+      <div class="enemy-team-section">
+        <h2>Enemy Team (<span id="enemyTeamCount">0</span>/6)</h2>
+        <div id="enemyTeam" class="enemy-team">
+          <div class="enemy-slot" data-slot="0">
+            <span class="slot-number">1</span>
+            <div class="enemy-slot-content">
+              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="0">
+              <button class="load-enemy-btn" data-slot="0">Load</button>
+            </div>
+          </div>
+          <div class="enemy-slot" data-slot="1">
+            <span class="slot-number">2</span>
+            <div class="enemy-slot-content">
+              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="1">
+              <button class="load-enemy-btn" data-slot="1">Load</button>
+            </div>
+          </div>
+          <div class="enemy-slot" data-slot="2">
+            <span class="slot-number">3</span>
+            <div class="enemy-slot-content">
+              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="2">
+              <button class="load-enemy-btn" data-slot="2">Load</button>
+            </div>
+          </div>
+          <div class="enemy-slot" data-slot="3">
+            <span class="slot-number">4</span>
+            <div class="enemy-slot-content">
+              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="3">
+              <button class="load-enemy-btn" data-slot="3">Load</button>
+            </div>
+          </div>
+          <div class="enemy-slot" data-slot="4">
+            <span class="slot-number">5</span>
+            <div class="enemy-slot-content">
+              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="4">
+              <button class="load-enemy-btn" data-slot="4">Load</button>
+            </div>
+          </div>
+          <div class="enemy-slot" data-slot="5">
+            <span class="slot-number">6</span>
+            <div class="enemy-slot-content">
+              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="5">
+              <button class="load-enemy-btn" data-slot="5">Load</button>
+            </div>
           </div>
         </div>
       </div>
@@ -112,6 +164,152 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
               <h3>Moves</h3>
               <ul id="detailMoves"></ul>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enemy Pokemon Customization Panel -->
+      <div id="customizePanel" class="customize-panel" style="display: none">
+        <div class="customize-header">
+          <h2 id="customizeName"></h2>
+          <button id="closeCustomizeBtn">&times;</button>
+        </div>
+        <div class="customize-content">
+          <div class="customize-image">
+            <img id="customizeSprite" src="" alt="Pokemon sprite" />
+          </div>
+          
+          <div class="customize-form">
+            <div class="form-group">
+              <label for="customizeLevel">Level:</label>
+              <input type="number" id="customizeLevel" min="1" max="100" value="100">
+            </div>
+            
+            <div class="form-group">
+              <label for="customizeNature">Nature:</label>
+              <select id="customizeNature">
+                <option value="Hardy">Hardy</option>
+                <option value="Lonely">Lonely</option>
+                <option value="Brave">Brave</option>
+                <option value="Adamant">Adamant</option>
+                <option value="Naughty">Naughty</option>
+                <option value="Bold">Bold</option>
+                <option value="Docile">Docile</option>
+                <option value="Relaxed">Relaxed</option>
+                <option value="Impish">Impish</option>
+                <option value="Lax">Lax</option>
+                <option value="Timid">Timid</option>
+                <option value="Hasty">Hasty</option>
+                <option value="Serious">Serious</option>
+                <option value="Jolly">Jolly</option>
+                <option value="Naive">Naive</option>
+                <option value="Modest">Modest</option>
+                <option value="Mild">Mild</option>
+                <option value="Quiet">Quiet</option>
+                <option value="Bashful">Bashful</option>
+                <option value="Rash">Rash</option>
+                <option value="Calm">Calm</option>
+                <option value="Gentle">Gentle</option>
+                <option value="Sassy">Sassy</option>
+                <option value="Careful">Careful</option>
+                <option value="Quirky">Quirky</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="customizeAbility">Ability:</label>
+              <input type="text" id="customizeAbility" placeholder="e.g., Intimidate">
+            </div>
+            
+            <div class="form-group">
+              <label for="customizeItem">Item:</label>
+              <input type="text" id="customizeItem" placeholder="e.g., Leftovers">
+            </div>
+            
+            <div class="form-section">
+              <h3>IVs (Individual Values)</h3>
+              <div class="stat-grid">
+                <div class="stat-input">
+                  <label>HP:</label>
+                  <input type="number" id="ivHP" min="0" max="31" value="31">
+                </div>
+                <div class="stat-input">
+                  <label>Atk:</label>
+                  <input type="number" id="ivAtk" min="0" max="31" value="31">
+                </div>
+                <div class="stat-input">
+                  <label>Def:</label>
+                  <input type="number" id="ivDef" min="0" max="31" value="31">
+                </div>
+                <div class="stat-input">
+                  <label>SpA:</label>
+                  <input type="number" id="ivSpA" min="0" max="31" value="31">
+                </div>
+                <div class="stat-input">
+                  <label>SpD:</label>
+                  <input type="number" id="ivSpD" min="0" max="31" value="31">
+                </div>
+                <div class="stat-input">
+                  <label>Spe:</label>
+                  <input type="number" id="ivSpe" min="0" max="31" value="31">
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-section">
+              <h3>EVs (Effort Values)</h3>
+              <div class="stat-grid">
+                <div class="stat-input">
+                  <label>HP:</label>
+                  <input type="number" id="evHP" min="0" max="252" step="4" value="0">
+                </div>
+                <div class="stat-input">
+                  <label>Atk:</label>
+                  <input type="number" id="evAtk" min="0" max="252" step="4" value="0">
+                </div>
+                <div class="stat-input">
+                  <label>Def:</label>
+                  <input type="number" id="evDef" min="0" max="252" step="4" value="0">
+                </div>
+                <div class="stat-input">
+                  <label>SpA:</label>
+                  <input type="number" id="evSpA" min="0" max="252" step="4" value="0">
+                </div>
+                <div class="stat-input">
+                  <label>SpD:</label>
+                  <input type="number" id="evSpD" min="0" max="252" step="4" value="0">
+                </div>
+                <div class="stat-input">
+                  <label>Spe:</label>
+                  <input type="number" id="evSpe" min="0" max="252" step="4" value="0">
+                </div>
+              </div>
+              <p class="ev-total">Total EVs: <span id="evTotal">0</span>/510</p>
+            </div>
+            
+            <div class="form-section">
+              <h3>Moves</h3>
+              <div class="moves-inputs">
+                <div class="form-group">
+                  <label for="move1">Move 1:</label>
+                  <input type="text" id="move1" placeholder="e.g., Flamethrower">
+                </div>
+                <div class="form-group">
+                  <label for="move2">Move 2:</label>
+                  <input type="text" id="move2" placeholder="e.g., Thunderbolt">
+                </div>
+                <div class="form-group">
+                  <label for="move3">Move 3:</label>
+                  <input type="text" id="move3" placeholder="e.g., Ice Beam">
+                </div>
+                <div class="form-group">
+                  <label for="move4">Move 4:</label>
+                  <input type="text" id="move4" placeholder="e.g., Protect">
+                </div>
+              </div>
+            </div>
+            
+            <button id="saveCustomizeBtn" class="save-btn">Save Changes</button>
           </div>
         </div>
       </div>
