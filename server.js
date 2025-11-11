@@ -109,6 +109,55 @@ app.post("/api/cache/clear", (req, res) => {
   res.json({ message: "Cache cleared successfully" });
 });
 
+// API endpoint to get move data by name or ID
+app.get("/api/move/:nameOrId", async (req, res) => {
+  const { nameOrId } = req.params;
+  const cacheKey = `move_${nameOrId.toLowerCase()}`;
+
+  try {
+    // Check if data is in cache
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      console.log(`Cache hit for move: ${nameOrId}`);
+      return res.json({ ...cachedData, cached: true });
+    }
+
+    // If not in cache, fetch from API
+    console.log(`Cache miss for move: ${nameOrId}, fetching from API...`);
+    const response = await axios.get(
+      `https://pokeapi.co/api/v2/move/${nameOrId.toLowerCase()}`
+    );
+
+    // Extract relevant move data
+    const moveData = {
+      id: response.data.id,
+      name: response.data.name,
+      type: response.data.type.name,
+      power: response.data.power,
+      accuracy: response.data.accuracy,
+      pp: response.data.pp,
+      damageClass: response.data.damage_class.name, // physical, special, or status
+      priority: response.data.priority,
+      effectChance: response.data.effect_chance,
+      effectEntries: response.data.effect_entries
+        .filter((e) => e.language.name === "en")
+        .map((e) => e.effect),
+    };
+
+    // Store in cache
+    cache.set(cacheKey, moveData);
+
+    res.json({ ...moveData, cached: false });
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      res.status(404).json({ error: "Move not found" });
+    } else {
+      console.error("Error fetching move:", error.message);
+      res.status(500).json({ error: "Failed to fetch move data" });
+    }
+  }
+});
+
 // Parse Showdown format and return Pokemon data
 app.post("/api/parse-showdown", async (req, res) => {
   const { showdownText } = req.body;
