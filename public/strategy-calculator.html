@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Battle Strategy Calculator</title>
+    <link rel="stylesheet" href="strategy-calculator.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>⚔️ Battle Strategy Calculator</h1>
+        <p class="subtitle">Calculate riskless Nuzlocke strategies</p>
+        <nav>
+          <a href="index.html">← Pokémon Viewer</a>
+          <a href="team-builder.html">← Team Builder</a>
+        </nav>
+      </header>
+
+      <!-- Teams Display Section -->
+      <div class="teams-container">
+        <!-- Your Team -->
+        <div class="team-display your-team-display">
+          <h2>Your Team</h2>
+          <div id="yourTeamDisplay" class="team-grid">
+            <p class="no-team-message">
+              No team loaded. Please build a team first.
+            </p>
+          </div>
+        </div>
+
+        <!-- Enemy Team -->
+        <div class="team-display enemy-team-display">
+          <h2>Enemy Team</h2>
+          <div id="enemyTeamDisplay" class="team-grid">
+            <p class="no-team-message">
+              No enemy team loaded. Please add an enemy team first.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Battle Setup Section -->
+      <div class="battle-setup-section">
+        <h2>Battle Setup</h2>
+        <div class="setup-controls">
+          <div class="control-group">
+            <label for="leadSelect">Your Lead Pokémon:</label>
+            <select id="leadSelect">
+              <option value="">Select your lead...</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="enemyLeadSelect">Enemy Lead Pokémon:</label>
+            <select id="enemyLeadSelect">
+              <option value="">Select enemy lead...</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <button id="calculateBtn" class="calculate-btn">
+              Calculate Strategy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Battle State Visualization -->
+      <div class="battle-state-section" style="display: none">
+        <h2>Current Battle State</h2>
+        <div class="battle-field">
+          <div class="active-pokemon your-active">
+            <h3>Your Active</h3>
+            <div id="yourActivePokemon" class="active-display"></div>
+          </div>
+          <div class="vs-indicator">VS</div>
+          <div class="active-pokemon enemy-active">
+            <h3>Enemy Active</h3>
+            <div id="enemyActivePokemon" class="active-display"></div>
+          </div>
+        </div>
+        <div class="field-effects">
+          <h3>Field Effects</h3>
+          <div id="fieldEffects" class="effects-display">
+            <p>No active field effects</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strategy Results Section -->
+      <div class="strategy-results-section" style="display: none">
+        <h2>Recommended Strategy</h2>
+        <div class="strategy-summary">
+          <div class="summary-stat">
+            <span class="stat-label">Risk Level:</span>
+            <span id="riskLevel" class="stat-value">-</span>
+          </div>
+          <div class="summary-stat">
+            <span class="stat-label">Expected Deaths:</span>
+            <span id="expectedDeaths" class="stat-value">-</span>
+          </div>
+          <div class="summary-stat">
+            <span class="stat-label">Turn Count:</span>
+            <span id="turnCount" class="stat-value">-</span>
+          </div>
+        </div>
+
+        <div class="strategy-timeline">
+          <h3>Battle Plan</h3>
+          <div id="strategyTimeline" class="timeline">
+            <!-- Timeline steps will be inserted here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Indicator -->
+      <div
+        id="loadingIndicator"
+        class="loading-indicator"
+        style="display: none"
+      >
+        <div class="spinner"></div>
+        <p>Calculating optimal strategy...</p>
+      </div>
+
+      <!-- Error Message -->
+      <div id="errorMessage" class="error-message" style="display: none"></div>
+    </div>
+
+    <script src="strategy-calculator.js"></script>
+  </body>
+</html>

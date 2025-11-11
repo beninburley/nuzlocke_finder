@@ -183,6 +183,7 @@ function handleDrop(e) {
   }
 
   renderTeam();
+  saveTeamsToLocalStorage();
 }
 
 // Render Team
@@ -224,6 +225,7 @@ function renderTeam() {
 function removePokemonFromTeam(index) {
   pokemonTeam[index] = null;
   renderTeam();
+  saveTeamsToLocalStorage();
   showMessage("Pokemon removed from team", "success");
 }
 
@@ -377,6 +379,7 @@ async function loadEnemyPokemon(e) {
     };
 
     renderEnemyTeam();
+    saveTeamsToLocalStorage();
     showMessage(`${capitalize(data.name)} loaded!`, "success");
     input.value = "";
   } catch (error) {
@@ -432,6 +435,7 @@ function renderEnemyTeam() {
 function removeEnemyPokemon(index) {
   enemyTeam[index] = null;
   renderEnemyTeam();
+  saveTeamsToLocalStorage();
   showMessage("Pokemon removed from enemy team", "success");
 }
 
@@ -579,6 +583,7 @@ function saveCustomization() {
   enemyTeam[currentCustomizeSlot].moves = moves;
 
   renderEnemyTeam();
+  saveTeamsToLocalStorage();
   closeCustomizePanel();
   showMessage("Pokemon customization saved!", "success");
 }
@@ -588,6 +593,12 @@ function closeCustomizePanel() {
   customizePanel.style.display = "none";
   currentCustomizeSlot = null;
   currentCustomizePokemon = null;
+}
+
+// Save Teams to LocalStorage
+function saveTeamsToLocalStorage() {
+  localStorage.setItem("pokemonTeam", JSON.stringify(pokemonTeam));
+  localStorage.setItem("enemyTeam", JSON.stringify(enemyTeam));
 }
 
 // Initialize
