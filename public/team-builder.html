@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokemon Team Builder</title>
+    <link rel="stylesheet" href="team-builder.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🎮 Pokemon Team Builder</h1>
+        <p class="subtitle">Build your dream team!</p>
+        <nav>
+          <a href="index.html">← Back to Pokemon Viewer</a>
+        </nav>
+      </header>
+
+      <!-- Import Section -->
+      <div class="import-section">
+        <h2>Import Pokemon (Showdown Format)</h2>
+        <textarea
+          id="showdownInput"
+          placeholder="Paste your Pokemon Showdown script here...
+
+Example:
+Drednaw
+Level: 38
+Hardy Nature
+Ability: Strong Jaw
+IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
+- Razor Shell
+- Rock Slide
+- Jaw Lock
+- Ice Fang"
+        ></textarea>
+        <button id="importBtn">Import Pokemon</button>
+        <button id="clearBoxBtn">Clear Box</button>
+      </div>
+
+      <!-- Error/Success Messages -->
+      <div id="messageBox" class="message-box" style="display: none"></div>
+
+      <!-- Pokemon Box (Storage) -->
+      <div class="box-section">
+        <h2>Pokemon Box (<span id="boxCount">0</span>/30)</h2>
+        <div id="pokemonBox" class="pokemon-box"></div>
+      </div>
+
+      <!-- Team Section -->
+      <div class="team-section">
+        <h2>Your Team (<span id="teamCount">0</span>/6)</h2>
+        <div id="pokemonTeam" class="pokemon-team">
+          <div class="team-slot" data-slot="0">
+            <span class="slot-number">1</span>
+            <span class="empty-text">Empty Slot</span>
+          </div>
+          <div class="team-slot" data-slot="1">
+            <span class="slot-number">2</span>
+            <span class="empty-text">Empty Slot</span>
+          </div>
+          <div class="team-slot" data-slot="2">
+            <span class="slot-number">3</span>
+            <span class="empty-text">Empty Slot</span>
+          </div>
+          <div class="team-slot" data-slot="3">
+            <span class="slot-number">4</span>
+            <span class="empty-text">Empty Slot</span>
+          </div>
+          <div class="team-slot" data-slot="4">
+            <span class="slot-number">5</span>
+            <span class="empty-text">Empty Slot</span>
+          </div>
+          <div class="team-slot" data-slot="5">
+            <span class="slot-number">6</span>
+            <span class="empty-text">Empty Slot</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pokemon Detail Panel -->
+      <div id="detailPanel" class="detail-panel" style="display: none">
+        <div class="detail-header">
+          <h2 id="detailName"></h2>
+          <button id="closeDetailBtn">&times;</button>
+        </div>
+        <div class="detail-content">
+          <div class="detail-image">
+            <img id="detailSprite" src="" alt="Pokemon sprite" />
+          </div>
+          <div class="detail-info">
+            <div class="info-group">
+              <h3>Basic Info</h3>
+              <p><strong>Level:</strong> <span id="detailLevel"></span></p>
+              <p><strong>Nature:</strong> <span id="detailNature"></span></p>
+              <p><strong>Ability:</strong> <span id="detailAbility"></span></p>
+              <p><strong>Item:</strong> <span id="detailItem"></span></p>
+            </div>
+            <div class="info-group">
+              <h3>Stats</h3>
+              <div id="detailStats"></div>
+            </div>
+            <div class="info-group">
+              <h3>IVs</h3>
+              <div id="detailIVs"></div>
+            </div>
+            <div class="info-group">
+              <h3>EVs</h3>
+              <div id="detailEVs"></div>
+            </div>
+            <div class="info-group">
+              <h3>Moves</h3>
+              <ul id="detailMoves"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="team-builder.js"></script>
+  </body>
+</html>
