@@ -373,7 +373,7 @@ async function loadEnemyPokemon(e) {
       ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
       evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
       moves: [],
-      allMoves: [] // Will be populated when customizing
+      allMoves: [], // Will be populated when customizing
     };
 
     renderEnemyTeam();
@@ -449,14 +449,21 @@ async function openCustomizePanel(slot) {
   if (!currentCustomizePokemon) return;
 
   // Populate basic info
-  document.getElementById("customizeName").textContent = capitalize(currentCustomizePokemon.name);
-  document.getElementById("customizeSprite").src = currentCustomizePokemon.sprite;
-  document.getElementById("customizeLevel").value = currentCustomizePokemon.level;
-  document.getElementById("customizeNature").value = currentCustomizePokemon.nature;
-  document.getElementById("customizeItem").value = currentCustomizePokemon.item || "";
+  document.getElementById("customizeName").textContent = capitalize(
+    currentCustomizePokemon.name
+  );
+  document.getElementById("customizeSprite").src =
+    currentCustomizePokemon.sprite;
+  document.getElementById("customizeLevel").value =
+    currentCustomizePokemon.level;
+  document.getElementById("customizeNature").value =
+    currentCustomizePokemon.nature;
+  document.getElementById("customizeItem").value =
+    currentCustomizePokemon.item || "";
 
   // Populate ability
-  document.getElementById("customizeAbility").value = currentCustomizePokemon.ability || "";
+  document.getElementById("customizeAbility").value =
+    currentCustomizePokemon.ability || "";
 
   // Populate IVs
   document.getElementById("ivHP").value = currentCustomizePokemon.ivs.hp;
@@ -484,8 +491,6 @@ async function openCustomizePanel(slot) {
 
   customizePanel.style.display = "block";
 }
-
-
 
 // Update EV Total
 function updateEVTotal() {
@@ -529,7 +534,7 @@ function saveCustomization() {
     document.getElementById("move2").value.trim(),
     document.getElementById("move3").value.trim(),
     document.getElementById("move4").value.trim(),
-  ].filter(move => move !== ""); // Remove empty moves
+  ].filter((move) => move !== ""); // Remove empty moves
 
   if (moves.length === 0) {
     showMessage("Please enter at least one move!", "error");
@@ -544,10 +549,14 @@ function saveCustomization() {
   }
 
   // Update pokemon data
-  enemyTeam[currentCustomizeSlot].level = parseInt(document.getElementById("customizeLevel").value);
-  enemyTeam[currentCustomizeSlot].nature = document.getElementById("customizeNature").value;
+  enemyTeam[currentCustomizeSlot].level = parseInt(
+    document.getElementById("customizeLevel").value
+  );
+  enemyTeam[currentCustomizeSlot].nature =
+    document.getElementById("customizeNature").value;
   enemyTeam[currentCustomizeSlot].ability = ability;
-  enemyTeam[currentCustomizeSlot].item = document.getElementById("customizeItem").value.trim() || null;
+  enemyTeam[currentCustomizeSlot].item =
+    document.getElementById("customizeItem").value.trim() || null;
 
   enemyTeam[currentCustomizeSlot].ivs = {
     hp: parseInt(document.getElementById("ivHP").value),

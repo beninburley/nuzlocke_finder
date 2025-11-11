@@ -88,42 +88,72 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
           <div class="enemy-slot" data-slot="0">
             <span class="slot-number">1</span>
             <div class="enemy-slot-content">
-              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="0">
+              <input
+                type="text"
+                class="enemy-input"
+                placeholder="Enter Pokemon name or ID"
+                data-slot="0"
+              />
               <button class="load-enemy-btn" data-slot="0">Load</button>
             </div>
           </div>
           <div class="enemy-slot" data-slot="1">
             <span class="slot-number">2</span>
             <div class="enemy-slot-content">
-              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="1">
+              <input
+                type="text"
+                class="enemy-input"
+                placeholder="Enter Pokemon name or ID"
+                data-slot="1"
+              />
               <button class="load-enemy-btn" data-slot="1">Load</button>
             </div>
           </div>
           <div class="enemy-slot" data-slot="2">
             <span class="slot-number">3</span>
             <div class="enemy-slot-content">
-              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="2">
+              <input
+                type="text"
+                class="enemy-input"
+                placeholder="Enter Pokemon name or ID"
+                data-slot="2"
+              />
               <button class="load-enemy-btn" data-slot="2">Load</button>
             </div>
           </div>
           <div class="enemy-slot" data-slot="3">
             <span class="slot-number">4</span>
             <div class="enemy-slot-content">
-              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="3">
+              <input
+                type="text"
+                class="enemy-input"
+                placeholder="Enter Pokemon name or ID"
+                data-slot="3"
+              />
               <button class="load-enemy-btn" data-slot="3">Load</button>
             </div>
           </div>
           <div class="enemy-slot" data-slot="4">
             <span class="slot-number">5</span>
             <div class="enemy-slot-content">
-              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="4">
+              <input
+                type="text"
+                class="enemy-input"
+                placeholder="Enter Pokemon name or ID"
+                data-slot="4"
+              />
               <button class="load-enemy-btn" data-slot="4">Load</button>
             </div>
           </div>
           <div class="enemy-slot" data-slot="5">
             <span class="slot-number">6</span>
             <div class="enemy-slot-content">
-              <input type="text" class="enemy-input" placeholder="Enter Pokemon name or ID" data-slot="5">
+              <input
+                type="text"
+                class="enemy-input"
+                placeholder="Enter Pokemon name or ID"
+                data-slot="5"
+              />
               <button class="load-enemy-btn" data-slot="5">Load</button>
             </div>
           </div>
@@ -178,13 +208,19 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
           <div class="customize-image">
             <img id="customizeSprite" src="" alt="Pokemon sprite" />
           </div>
-          
+
           <div class="customize-form">
             <div class="form-group">
               <label for="customizeLevel">Level:</label>
-              <input type="number" id="customizeLevel" min="1" max="100" value="100">
+              <input
+                type="number"
+                id="customizeLevel"
+                min="1"
+                max="100"
+                value="100"
+              />
             </div>
-            
+
             <div class="form-group">
               <label for="customizeNature">Nature:</label>
               <select id="customizeNature">
@@ -215,100 +251,158 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
                 <option value="Quirky">Quirky</option>
               </select>
             </div>
-            
+
             <div class="form-group">
               <label for="customizeAbility">Ability:</label>
-              <input type="text" id="customizeAbility" placeholder="e.g., Intimidate">
+              <input
+                type="text"
+                id="customizeAbility"
+                placeholder="e.g., Intimidate"
+              />
             </div>
-            
+
             <div class="form-group">
               <label for="customizeItem">Item:</label>
-              <input type="text" id="customizeItem" placeholder="e.g., Leftovers">
+              <input
+                type="text"
+                id="customizeItem"
+                placeholder="e.g., Leftovers"
+              />
             </div>
-            
+
             <div class="form-section">
               <h3>IVs (Individual Values)</h3>
               <div class="stat-grid">
                 <div class="stat-input">
                   <label>HP:</label>
-                  <input type="number" id="ivHP" min="0" max="31" value="31">
+                  <input type="number" id="ivHP" min="0" max="31" value="31" />
                 </div>
                 <div class="stat-input">
                   <label>Atk:</label>
-                  <input type="number" id="ivAtk" min="0" max="31" value="31">
+                  <input type="number" id="ivAtk" min="0" max="31" value="31" />
                 </div>
                 <div class="stat-input">
                   <label>Def:</label>
-                  <input type="number" id="ivDef" min="0" max="31" value="31">
+                  <input type="number" id="ivDef" min="0" max="31" value="31" />
                 </div>
                 <div class="stat-input">
                   <label>SpA:</label>
-                  <input type="number" id="ivSpA" min="0" max="31" value="31">
+                  <input type="number" id="ivSpA" min="0" max="31" value="31" />
                 </div>
                 <div class="stat-input">
                   <label>SpD:</label>
-                  <input type="number" id="ivSpD" min="0" max="31" value="31">
+                  <input type="number" id="ivSpD" min="0" max="31" value="31" />
                 </div>
                 <div class="stat-input">
                   <label>Spe:</label>
-                  <input type="number" id="ivSpe" min="0" max="31" value="31">
+                  <input type="number" id="ivSpe" min="0" max="31" value="31" />
                 </div>
               </div>
             </div>
-            
+
             <div class="form-section">
               <h3>EVs (Effort Values)</h3>
               <div class="stat-grid">
                 <div class="stat-input">
                   <label>HP:</label>
-                  <input type="number" id="evHP" min="0" max="252" step="4" value="0">
+                  <input
+                    type="number"
+                    id="evHP"
+                    min="0"
+                    max="252"
+                    step="4"
+                    value="0"
+                  />
                 </div>
                 <div class="stat-input">
                   <label>Atk:</label>
-                  <input type="number" id="evAtk" min="0" max="252" step="4" value="0">
+                  <input
+                    type="number"
+                    id="evAtk"
+                    min="0"
+                    max="252"
+                    step="4"
+                    value="0"
+                  />
                 </div>
                 <div class="stat-input">
                   <label>Def:</label>
-                  <input type="number" id="evDef" min="0" max="252" step="4" value="0">
+                  <input
+                    type="number"
+                    id="evDef"
+                    min="0"
+                    max="252"
+                    step="4"
+                    value="0"
+                  />
                 </div>
                 <div class="stat-input">
                   <label>SpA:</label>
-                  <input type="number" id="evSpA" min="0" max="252" step="4" value="0">
+                  <input
+                    type="number"
+                    id="evSpA"
+                    min="0"
+                    max="252"
+                    step="4"
+                    value="0"
+                  />
                 </div>
                 <div class="stat-input">
                   <label>SpD:</label>
-                  <input type="number" id="evSpD" min="0" max="252" step="4" value="0">
+                  <input
+                    type="number"
+                    id="evSpD"
+                    min="0"
+                    max="252"
+                    step="4"
+                    value="0"
+                  />
                 </div>
                 <div class="stat-input">
                   <label>Spe:</label>
-                  <input type="number" id="evSpe" min="0" max="252" step="4" value="0">
+                  <input
+                    type="number"
+                    id="evSpe"
+                    min="0"
+                    max="252"
+                    step="4"
+                    value="0"
+                  />
                 </div>
               </div>
               <p class="ev-total">Total EVs: <span id="evTotal">0</span>/510</p>
             </div>
-            
+
             <div class="form-section">
               <h3>Moves</h3>
               <div class="moves-inputs">
                 <div class="form-group">
                   <label for="move1">Move 1:</label>
-                  <input type="text" id="move1" placeholder="e.g., Flamethrower">
+                  <input
+                    type="text"
+                    id="move1"
+                    placeholder="e.g., Flamethrower"
+                  />
                 </div>
                 <div class="form-group">
                   <label for="move2">Move 2:</label>
-                  <input type="text" id="move2" placeholder="e.g., Thunderbolt">
+                  <input
+                    type="text"
+                    id="move2"
+                    placeholder="e.g., Thunderbolt"
+                  />
                 </div>
                 <div class="form-group">
                   <label for="move3">Move 3:</label>
-                  <input type="text" id="move3" placeholder="e.g., Ice Beam">
+                  <input type="text" id="move3" placeholder="e.g., Ice Beam" />
                 </div>
                 <div class="form-group">
                   <label for="move4">Move 4:</label>
-                  <input type="text" id="move4" placeholder="e.g., Protect">
+                  <input type="text" id="move4" placeholder="e.g., Protect" />
                 </div>
               </div>
             </div>
-            
+
             <button id="saveCustomizeBtn" class="save-btn">Save Changes</button>
           </div>
         </div>
