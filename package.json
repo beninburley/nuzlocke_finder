@@ -1,0 +1,23 @@
+{
+  "name": "pokemon-api-viewer",
+  "version": "1.0.0",
+  "description": "A simple Node.js website to display Pokemon information with caching",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "pokemon",
+    "api",
+    "express",
+    "cache"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "node-cache": "^5.1.2"
+  }
+}

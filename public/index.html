@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokemon Viewer</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🎮 Pokemon Viewer</h1>
+        <p class="subtitle">Search and explore Pokemon with caching!</p>
+      </header>
+
+      <div class="search-section">
+        <div class="search-box">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Enter Pokemon name or ID (e.g., pikachu or 25)"
+          />
+          <button id="searchBtn">Search</button>
+        </div>
+        <div class="cache-controls">
+          <button id="cacheStatsBtn">Cache Stats</button>
+          <button id="clearCacheBtn">Clear Cache</button>
+        </div>
+      </div>
+
+      <div id="cacheInfo" class="cache-info"></div>
+
+      <div id="loadingIndicator" class="loading" style="display: none">
+        <div class="spinner"></div>
+        <p>Loading Pokemon data...</p>
+      </div>
+
+      <div id="errorMessage" class="error-message" style="display: none"></div>
+
+      <div id="pokemonDisplay" class="pokemon-display" style="display: none">
+        <div class="pokemon-card">
+          <div class="pokemon-header">
+            <h2 id="pokemonName"></h2>
+            <span id="pokemonId" class="pokemon-id"></span>
+          </div>
+
+          <div class="pokemon-images">
+            <img id="pokemonSprite" src="" alt="Pokemon sprite" />
+            <img id="pokemonSpriteShiny" src="" alt="Pokemon shiny sprite" />
+          </div>
+
+          <div class="pokemon-info">
+            <div class="info-row">
+              <span class="label">Height:</span>
+              <span id="pokemonHeight"></span>
+            </div>
+            <div class="info-row">
+              <span class="label">Weight:</span>
+              <span id="pokemonWeight"></span>
+            </div>
+            <div class="info-row">
+              <span class="label">Types:</span>
+              <div id="pokemonTypes" class="types"></div>
+            </div>
+            <div class="info-row">
+              <span class="label">Abilities:</span>
+              <div id="pokemonAbilities" class="abilities"></div>
+            </div>
+          </div>
+
+          <div class="pokemon-stats">
+            <h3>Base Stats</h3>
+            <div id="statsContainer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="random-section">
+        <button id="randomBtn">Get Random Pokemon</button>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
