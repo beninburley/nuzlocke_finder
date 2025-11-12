@@ -4,6 +4,17 @@
 
 import { TYPE_CHART } from "./battle-engine/constants/type-chart.js";
 import { NATURES } from "./battle-engine/constants/nature-modifiers.js";
+import {
+  calculateHP,
+  calculateStat,
+  calculateAllStats,
+} from "./battle-engine/core/stat-calculator.js";
+import { getTypeEffectiveness } from "./battle-engine/core/type-effectiveness.js";
+import {
+  calculateDamage,
+  calculateWorstCaseDamage,
+} from "./battle-engine/core/damage-calculator.js";
+import { BattleState } from "./battle-engine/core/BattleState.js";
 
 // ============================================================================
 // STATE MANAGEMENT
@@ -13,196 +24,6 @@ let yourTeam = [];
 let enemyTeam = [];
 let yourLeadIndex = null;
 let enemyLeadIndex = null;
-
-// ============================================================================
-// STAT CALCULATION (GEN 8 FORMULA)
-// ============================================================================
-
-/**
- * Calculate HP stat
- * Formula: floor(((2 * Base + IV + floor(EV/4)) * Level) / 100) + Level + 10
- */
-function calculateHP(baseStat, iv, ev, level) {
-  return (
-    Math.floor(((2 * baseStat + iv + Math.floor(ev / 4)) * level) / 100) +
-    level +
-    10
-  );
-}
-
-/**
- * Calculate other stats (Attack, Defense, Special Attack, Special Defense, Speed)
- * Formula: floor((floor(((2 * Base + IV + floor(EV/4)) * Level) / 100) + 5) * Nature)
- */
-function calculateStat(baseStat, iv, ev, level, natureMod) {
-  const base =
-    Math.floor(((2 * baseStat + iv + Math.floor(ev / 4)) * level) / 100) + 5;
-  return Math.floor(base * natureMod);
-}
-
-/**
- * Calculate all stats for a Pokemon
- */
-function calculateAllStats(pokemon) {
-  const nature = NATURES[pokemon.nature?.toLowerCase()] || NATURES.hardy;
-  const level = pokemon.level || 100;
-
-  // Get IVs (default to 31)
-  const ivs = pokemon.ivs || {
-    hp: 31,
-    atk: 31,
-    def: 31,
-    spa: 31,
-    spd: 31,
-    spe: 31,
-  };
-
-  // Get EVs (default to 0)
-  const evs = pokemon.evs || { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-
-  // Get base stats from the pokemon's stats array
-  const baseStats = {};
-  pokemon.stats.forEach((stat) => {
-    const statName = stat.name
-      .replace("special-attack", "spa")
-      .replace("special-defense", "spd")
-      .replace("attack", "atk")
-      .replace("defense", "def")
-      .replace("speed", "spe");
-    baseStats[statName] = stat.value;
-  });
-
-  return {
-    hp: calculateHP(baseStats.hp, ivs.hp, evs.hp, level),
-    atk: calculateStat(baseStats.atk, ivs.atk, evs.atk, level, nature.atk),
-    def: calculateStat(baseStats.def, ivs.def, evs.def, level, nature.def),
-    spa: calculateStat(baseStats.spa, ivs.spa, evs.spa, level, nature.spa),
-    spd: calculateStat(baseStats.spd, ivs.spd, evs.spd, level, nature.spd),
-    spe: calculateStat(baseStats.spe, ivs.spe, evs.spe, level, nature.spe),
-  };
-}
-
-// ============================================================================
-// TYPE EFFECTIVENESS CALCULATION
-// ============================================================================
-
-/**
- * Get type effectiveness multiplier
- * @param {string} moveType - Type of the attacking move
- * @param {Array<string>} defenderTypes - Types of the defending Pokemon
- * @returns {number} - Effectiveness multiplier (0, 0.25, 0.5, 1, 2, or 4)
- */
-function getTypeEffectiveness(moveType, defenderTypes) {
-  let multiplier = 1;
-
-  defenderTypes.forEach((defenderType) => {
-    const matchup = TYPE_CHART[moveType]?.[defenderType];
-    if (matchup !== undefined) {
-      multiplier *= matchup;
-    }
-  });
-
-  return multiplier;
-}
-
-// ============================================================================
-// DAMAGE CALCULATION (GEN 8 FORMULA)
-// ============================================================================
-
-/**
- * Calculate damage for a move
- * Formula: ((((2 * Level / 5 + 2) * Power * A / D) / 50) + 2) * Modifiers
- * Modifiers: STAB, Type Effectiveness, Random (0.85-1.0)
- */
-function calculateDamage(
-  attacker,
-  defender,
-  move,
-  attackerStats,
-  defenderStats
-) {
-  // Check if move data is available
-  if (!move.power || move.power === 0) {
-    return { min: 0, max: 0, average: 0 };
-  }
-
-  const level = attacker.level || 100;
-  const power = move.power;
-
-  // Determine if physical or special
-  const isPhysical = move.damageClass === "physical";
-  const attackStat = isPhysical ? attackerStats.atk : attackerStats.spa;
-  const defenseStat = isPhysical ? defenderStats.def : defenderStats.spd;
-
-  // Base damage calculation
-  const baseDamage = Math.floor(
-    (Math.floor((2 * level) / 5 + 2) * power * attackStat) / defenseStat / 50 +
-      2
-  );
-
-  // STAB (Same Type Attack Bonus) - 1.5x if move type matches attacker type
-  let stab = 1;
-  if (attacker.types.includes(move.type)) {
-    stab = 1.5;
-  }
-
-  // Type effectiveness
-  const effectiveness = getTypeEffectiveness(move.type, defender.types);
-
-  // Random multiplier (85% - 100%)
-  const minRandom = 0.85;
-  const maxRandom = 1.0;
-
-  const minDamage = Math.floor(baseDamage * stab * effectiveness * minRandom);
-  const maxDamage = Math.floor(baseDamage * stab * effectiveness * maxRandom);
-  const avgDamage = Math.floor((minDamage + maxDamage) / 2);
-
-  return {
-    min: minDamage,
-    max: maxDamage,
-    average: avgDamage,
-    effectiveness: effectiveness,
-    isStab: stab > 1,
-  };
-}
-
-/**
- * Calculate worst-case damage (for risk analysis)
- * Enemy attacks: Always crit (1.5x) + max roll
- * Player attacks: Always min roll, no crit
- * @param {Object} attacker - Attacking Pokemon
- * @param {Object} defender - Defending Pokemon
- * @param {Object} move - Move being used
- * @param {Object} attackerStats - Attacker's stats
- * @param {Object} defenderStats - Defender's stats
- * @param {boolean} isPlayerAttacking - True if player is attacking
- * @returns {number} - Worst case damage value
- */
-function calculateWorstCaseDamage(
-  attacker,
-  defender,
-  move,
-  attackerStats,
-  defenderStats,
-  isPlayerAttacking
-) {
-  const normalDamage = calculateDamage(
-    attacker,
-    defender,
-    move,
-    attackerStats,
-    defenderStats
-  );
-
-  if (isPlayerAttacking) {
-    // Player attacking: minimum damage roll
-    return normalDamage.min;
-  } else {
-    // Enemy attacking: maximum damage + crit (1.5x multiplier)
-    const critMultiplier = 1.5;
-    return Math.floor(normalDamage.max * critMultiplier);
-  }
-}
 
 // ============================================================================
 // WORST-CASE SCENARIO SIMULATION
@@ -801,71 +622,6 @@ function attachMoveData(pokemon, moveDataMap) {
 
       return data;
     });
-}
-
-// ============================================================================
-// BATTLE STATE MANAGER
-// ============================================================================
-
-class BattleState {
-  constructor(yourTeam, enemyTeam, yourLeadIndex, enemyLeadIndex) {
-    this.yourTeam = yourTeam.map((p) => ({
-      ...p,
-      stats: calculateAllStats(p),
-      currentHP: null, // Will be set after stats are calculated
-      fainted: false,
-      status: null, // 'sleep', 'paralysis', 'burn', 'poison', 'freeze', 'toxic'
-      statusCounter: 0, // For sleep (1-3 turns), toxic counter, etc.
-      confusion: 0, // Confusion turns remaining (1-4)
-      hasSubstitute: false, // Substitute active
-    }));
-
-    this.enemyTeam = enemyTeam.map((p) => ({
-      ...p,
-      stats: calculateAllStats(p),
-      currentHP: null,
-      fainted: false,
-      status: null,
-      statusCounter: 0,
-      confusion: 0,
-      hasSubstitute: false,
-    }));
-
-    // Set current HP to max HP
-    this.yourTeam.forEach((p) => (p.currentHP = p.stats.hp));
-    this.enemyTeam.forEach((p) => (p.currentHP = p.stats.hp));
-
-    this.yourActiveIndex = yourLeadIndex;
-    this.enemyActiveIndex = enemyLeadIndex;
-
-    this.fieldEffects = {
-      weather: null, // sun, rain, sandstorm, hail
-      terrain: null, // electric, grassy, misty, psychic
-      yourHazards: { stealthRock: false, spikes: 0, toxicSpikes: 0 },
-      enemyHazards: { stealthRock: false, spikes: 0, toxicSpikes: 0 },
-    };
-
-    this.turnCount = 0;
-  }
-
-  getYourActive() {
-    return this.yourTeam[this.yourActiveIndex];
-  }
-
-  getEnemyActive() {
-    return this.enemyTeam[this.enemyActiveIndex];
-  }
-
-  clone() {
-    const cloned = new BattleState([], [], 0, 0);
-    cloned.yourTeam = JSON.parse(JSON.stringify(this.yourTeam));
-    cloned.enemyTeam = JSON.parse(JSON.stringify(this.enemyTeam));
-    cloned.yourActiveIndex = this.yourActiveIndex;
-    cloned.enemyActiveIndex = this.enemyActiveIndex;
-    cloned.fieldEffects = JSON.parse(JSON.stringify(this.fieldEffects));
-    cloned.turnCount = this.turnCount;
-    return cloned;
-  }
 }
 
 // ============================================================================
