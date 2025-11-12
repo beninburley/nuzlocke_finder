@@ -1421,8 +1421,8 @@ function findBestActionWithLookahead(state, isPlayer, depth = 2) {
 }
 
 /**
- * Enemy AI: Select action based on simple heuristics (no lookahead)
- * Uses switch-in scoring and highest damage move selection
+ * Enemy AI: Select action based on Run & Bun AI scoring system
+ * Implements probability-based move scoring as per AI specification
  * @param {BattleState} state - Current state
  * @returns {Object} - Selected action
  */
@@ -1442,12 +1442,15 @@ function selectEnemyAction(state) {
     return null;
   }
 
-  // Select move with highest average damage
-  let bestMove = moveActions[0];
-  let bestDamage = -1;
+  // Calculate scores for each move according to Run & Bun AI specification
+  const moveScores = moveActions.map((action) => {
+    let score = 0;
 
-  moveActions.forEach((action) => {
-    if (action.move.damageClass !== "status") {
+    if (action.move.damageClass === "status") {
+      // Status moves default to +6
+      score = 6;
+    } else {
+      // Damaging moves: calculate damage and score
       const damage = calculateDamage(
         enemyActive,
         yourActive,
@@ -1456,19 +1459,55 @@ function selectEnemyAction(state) {
         yourActive.stats
       );
 
-      if (damage.average > bestDamage) {
-        bestDamage = damage.average;
-        bestMove = action;
+      // Store damage for comparison
+      action._calculatedDamage = damage;
+      score = 0; // Will be set if this is highest damage move
+    }
+
+    return { action, score, damage: action._calculatedDamage };
+  });
+
+  // Find highest damaging move(s)
+  let maxDamage = -1;
+  moveScores.forEach((ms) => {
+    if (ms.damage && ms.damage.average > maxDamage) {
+      maxDamage = ms.damage.average;
+    }
+  });
+
+  // Assign scores to moves
+  moveScores.forEach((ms) => {
+    if (ms.damage) {
+      const isHighestDamage = ms.damage.average === maxDamage && maxDamage > 0;
+      const moveKills = ms.damage.average >= yourActive.currentHP;
+      const enemyIsFaster = enemyActive.stats.spe >= yourActive.stats.spe; // AI sees ties as faster
+
+      if (isHighestDamage) {
+        // Highest damaging move: +6 (80%), +8 (20%)
+        ms.score = Math.random() < 0.8 ? 6 : 8;
+      }
+
+      if (moveKills) {
+        // Kill bonus
+        if (enemyIsFaster) {
+          // Fast kill: additional +6
+          ms.score += 6;
+        } else {
+          // Slow kill: additional +3
+          ms.score += 3;
+        }
       }
     }
   });
 
-  // If all moves are status moves, just use the first one
-  if (bestDamage === -1) {
-    return moveActions[0];
-  }
+  // Find all moves with highest score
+  const maxScore = Math.max(...moveScores.map((ms) => ms.score));
+  const bestMoves = moveScores.filter((ms) => ms.score === maxScore);
 
-  return bestMove;
+  // Randomly select from moves with highest score
+  const selected = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+
+  return selected.action;
 }
 
 /**
