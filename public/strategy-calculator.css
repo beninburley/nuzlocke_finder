@@ -491,6 +491,64 @@ nav a:hover {
   color: #721c24;
 }
 
+/* Enhanced Risk Details */
+.crit-risks,
+.status-risks,
+.ai-move-analysis {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.crit-risks {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.status-risks {
+  background: #e7f3ff;
+  border-left: 4px solid #2196f3;
+}
+
+.ai-move-analysis {
+  background: #f3e5f5;
+  border-left: 4px solid #9c27b0;
+}
+
+.crit-risks strong,
+.status-risks strong,
+.ai-move-analysis strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.crit-risks ul,
+.status-risks ul,
+.ai-move-analysis ul {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 6px;
+}
+
+.crit-risks li,
+.status-risks li,
+.ai-move-analysis li {
+  padding: 4px 0;
+  color: #555;
+}
+
+.influence-tips {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.influence-tips strong {
+  color: #4caf50;
+}
+
 /* Loading Indicator */
 .loading-indicator {
   background: white;
