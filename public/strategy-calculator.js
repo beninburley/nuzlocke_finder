@@ -354,6 +354,377 @@ function calculateDamage(
   };
 }
 
+/**
+ * Calculate worst-case damage (for risk analysis)
+ * Enemy attacks: Always crit (1.5x) + max roll
+ * Player attacks: Always min roll, no crit
+ * @param {Object} attacker - Attacking Pokemon
+ * @param {Object} defender - Defending Pokemon
+ * @param {Object} move - Move being used
+ * @param {Object} attackerStats - Attacker's stats
+ * @param {Object} defenderStats - Defender's stats
+ * @param {boolean} isPlayerAttacking - True if player is attacking
+ * @returns {number} - Worst case damage value
+ */
+function calculateWorstCaseDamage(
+  attacker,
+  defender,
+  move,
+  attackerStats,
+  defenderStats,
+  isPlayerAttacking
+) {
+  const normalDamage = calculateDamage(
+    attacker,
+    defender,
+    move,
+    attackerStats,
+    defenderStats
+  );
+
+  if (isPlayerAttacking) {
+    // Player attacking: minimum damage roll
+    return normalDamage.min;
+  } else {
+    // Enemy attacking: maximum damage + crit (1.5x multiplier)
+    const critMultiplier = 1.5;
+    return Math.floor(normalDamage.max * critMultiplier);
+  }
+}
+
+// ============================================================================
+// WORST-CASE SCENARIO SIMULATION
+// ============================================================================
+
+/**
+ * Simulate battle with worst-case assumptions
+ * @param {BattleState} state - Initial battle state
+ * @param {Object} yourAction - Player's action
+ * @param {Object} enemyAction - Enemy's action
+ * @returns {Object} - Turn result with worst-case damage
+ */
+function simulateTurnWorstCase(state, yourAction, enemyAction) {
+  state.turnCount++;
+  const events = [];
+
+  // Determine action order based on priority and speed
+  const actions = [
+    { action: yourAction, isPlayer: true },
+    { action: enemyAction, isPlayer: false },
+  ];
+
+  // Sort by priority, then speed (enemy always wins speed ties in worst case)
+  actions.sort((a, b) => {
+    const aPriority =
+      a.action.type === "move" ? a.action.move.priority || 0 : 6;
+    const bPriority =
+      b.action.type === "move" ? b.action.move.priority || 0 : 6;
+
+    if (aPriority !== bPriority) {
+      return bPriority - aPriority;
+    }
+
+    const aPokemon = a.isPlayer
+      ? state.getYourActive()
+      : state.getEnemyActive();
+    const bPokemon = b.isPlayer
+      ? state.getYourActive()
+      : state.getEnemyActive();
+
+    // In worst case, enemy always wins speed ties
+    if (
+      a.isPlayer &&
+      !b.isPlayer &&
+      aPokemon.stats.spe === bPokemon.stats.spe
+    ) {
+      return 1; // Enemy goes first
+    }
+
+    return bPokemon.stats.spe - aPokemon.stats.spe;
+  });
+
+  // Execute actions in order
+  actions.forEach(({ action, isPlayer }) => {
+    const attacker = isPlayer ? state.getYourActive() : state.getEnemyActive();
+    const defender = isPlayer ? state.getEnemyActive() : state.getYourActive();
+
+    if (attacker.fainted) return;
+
+    if (action.type === "switch") {
+      if (isPlayer) {
+        state.yourActiveIndex = action.switchToIndex;
+      } else {
+        state.enemyActiveIndex = action.switchToIndex;
+      }
+
+      events.push({
+        type: "switch",
+        isPlayer: isPlayer,
+        pokemon: action.pokemon,
+        text: `${isPlayer ? "You" : "Enemy"} switched to ${capitalize(
+          action.pokemon.name
+        )}!`,
+      });
+    } else if (action.type === "move") {
+      // Check if Pokemon can move (worst-case: always full para, never thaw, confusion hits)
+      const worstCaseForPlayer = isPlayer; // Worst case for player means player gets bad outcomes
+      if (!canPokemonMove(attacker, events, worstCaseForPlayer)) {
+        return; // Pokemon can't move this turn
+      }
+
+      const move = action.move;
+
+      events.push({
+        type: "move-use",
+        isPlayer: isPlayer,
+        move: move,
+        text: `${capitalize(attacker.name)} used ${capitalize(move.name)}!`,
+      });
+
+      if (move.damageClass === "status") {
+        // Status moves - apply effects (enemy always succeeds, player may fail)
+        const moveName = move.name.toLowerCase();
+
+        if (
+          moveName === "hypnosis" ||
+          moveName === "sleep-powder" ||
+          moveName === "spore"
+        ) {
+          applyStatusEffect(defender, "sleep", events);
+        } else if (
+          moveName === "thunder-wave" ||
+          moveName === "stun-spore" ||
+          moveName === "glare"
+        ) {
+          applyStatusEffect(defender, "paralysis", events);
+        } else if (
+          moveName === "will-o-wisp" ||
+          moveName === "scald" ||
+          moveName === "flare-blitz"
+        ) {
+          applyStatusEffect(defender, "burn", events);
+        } else if (moveName === "poison-powder" || moveName === "poison-gas") {
+          applyStatusEffect(defender, "poison", events);
+        } else if (moveName === "toxic") {
+          applyStatusEffect(defender, "toxic", events);
+        } else if (
+          moveName === "confuse-ray" ||
+          moveName === "supersonic" ||
+          moveName === "swagger"
+        ) {
+          if (defender.confusion === 0) {
+            defender.confusion = isPlayer ? 1 : 4; // Worst case: player causes min, enemy causes max
+            events.push({
+              type: "confusion",
+              text: `${capitalize(defender.name)} became confused!`,
+            });
+          }
+        }
+      } else {
+        // Check accuracy for player moves
+        if (isPlayer && move.accuracy && move.accuracy < 100) {
+          events.push({
+            type: "accuracy-risk",
+            isPlayer: true,
+            move: move,
+            accuracy: move.accuracy,
+            text: `⚠️ ${capitalize(move.name)} has ${
+              move.accuracy
+            }% accuracy - risk of missing`,
+          });
+        }
+
+        const attackerStats = attacker.stats;
+        const defenderStats = defender.stats;
+
+        // Modify attack stat if burned
+        const effectiveAttackerStats = { ...attackerStats };
+        if (attacker.status === "burn" && move.damageClass === "physical") {
+          effectiveAttackerStats.atk = Math.floor(
+            effectiveAttackerStats.atk / 2
+          );
+        }
+
+        // Use worst-case damage
+        const worstCaseDamage = calculateWorstCaseDamage(
+          attacker,
+          defender,
+          move,
+          effectiveAttackerStats,
+          defenderStats,
+          isPlayer
+        );
+
+        const actualDamage = Math.min(worstCaseDamage, defender.currentHP);
+        defender.currentHP -= actualDamage;
+
+        if (defender.currentHP <= 0) {
+          defender.currentHP = 0;
+          defender.fainted = true;
+        }
+
+        const damageInfo = calculateDamage(
+          attacker,
+          defender,
+          move,
+          effectiveAttackerStats,
+          defenderStats
+        );
+        let effectText = "";
+        if (damageInfo.effectiveness > 1) effectText = " It's super effective!";
+        if (damageInfo.effectiveness < 1 && damageInfo.effectiveness > 0)
+          effectText = " It's not very effective...";
+        if (damageInfo.effectiveness === 0)
+          effectText = " It doesn't affect the target...";
+
+        const critText = !isPlayer ? " [CRIT]" : "";
+
+        events.push({
+          type: "move",
+          isPlayer: isPlayer,
+          move: move,
+          damage: actualDamage,
+          effectiveness: damageInfo.effectiveness,
+          text: `${actualDamage} damage.${effectText}`,
+        });
+
+        if (defender.fainted) {
+          events.push({
+            type: "faint",
+            isPlayer: !isPlayer,
+            pokemon: defender,
+            text: `${capitalize(defender.name)} fainted!`,
+          });
+        }
+      }
+    }
+  });
+
+  // Apply end-of-turn status damage (worst case for player)
+  applyEndOfTurnStatus(state.getYourActive(), events);
+  applyEndOfTurnStatus(state.getEnemyActive(), events);
+
+  return { state: state, events: events };
+}
+
+/**
+ * Calculate worst-case strategy outcomes
+ * @param {BattleState} initialState - Starting battle state
+ * @param {number} maxDepth - Maximum turns to simulate
+ * @returns {Object} - Worst case analysis with death count and risk tier
+ */
+function calculateWorstCaseStrategy(initialState, maxDepth = 20) {
+  const strategy = [];
+  let currentState = initialState.clone();
+  let turnCount = 0;
+  let yourDeaths = 0;
+  let enemyDeaths = 0;
+
+  while (turnCount < maxDepth) {
+    turnCount++;
+
+    const yourAlive = currentState.yourTeam.filter((p) => !p.fainted).length;
+    const enemyAlive = currentState.enemyTeam.filter((p) => !p.fainted).length;
+
+    if (yourAlive === 0 || enemyAlive === 0) {
+      break;
+    }
+
+    // Player uses lookahead to find best action
+    const yourResult = findBestActionWithLookahead(currentState, true, 2);
+    const yourAction = yourResult.action;
+
+    if (!yourAction) break;
+
+    // Enemy uses AI logic (same as normal simulation)
+    const enemyAction = selectEnemyAction(currentState);
+
+    if (!enemyAction) break;
+
+    // Track deaths before this turn
+    const yourAliveBeforeTurn = currentState.yourTeam.filter(
+      (p) => !p.fainted
+    ).length;
+    const enemyAliveBeforeTurn = currentState.enemyTeam.filter(
+      (p) => !p.fainted
+    ).length;
+
+    // Execute turn with worst-case damage
+    const result = simulateTurnWorstCase(currentState, yourAction, enemyAction);
+    currentState = result.state;
+
+    // Track deaths after this turn
+    const yourAliveAfterTurn = currentState.yourTeam.filter(
+      (p) => !p.fainted
+    ).length;
+    const enemyAliveAfterTurn = currentState.enemyTeam.filter(
+      (p) => !p.fainted
+    ).length;
+
+    const yourDeathsThisTurn = yourAliveBeforeTurn - yourAliveAfterTurn;
+    const enemyDeathsThisTurn = enemyAliveBeforeTurn - enemyAliveAfterTurn;
+
+    yourDeaths += yourDeathsThisTurn;
+    enemyDeaths += enemyDeathsThisTurn;
+
+    // Handle forced switches
+    if (currentState.getYourActive().fainted) {
+      const switchEvent = handleForcedSwitch(currentState, true);
+      if (switchEvent) result.events.push(switchEvent);
+    }
+
+    if (currentState.getEnemyActive().fainted) {
+      const switchEvent = handleForcedSwitch(currentState, false);
+      if (switchEvent) result.events.push(switchEvent);
+    }
+
+    strategy.push({
+      turn: currentState.turnCount,
+      action: yourAction,
+      events: result.events,
+      state: currentState.clone(),
+      yourDeathsThisTurn: yourDeathsThisTurn,
+      enemyDeathsThisTurn: enemyDeathsThisTurn,
+    });
+  }
+
+  // Determine risk tier
+  const finalYourAlive = currentState.yourTeam.filter((p) => !p.fainted).length;
+  const finalEnemyAlive = currentState.enemyTeam.filter(
+    (p) => !p.fainted
+  ).length;
+
+  const weWin = finalEnemyAlive === 0 && finalYourAlive > 0;
+  const weLose = finalYourAlive === 0;
+
+  let riskTier = "";
+  if (weLose) {
+    riskTier = "⚠️ LOSS RISK - Can lose the battle in worst case";
+  } else if (!weWin) {
+    riskTier = "⚠️ INCONCLUSIVE - Battle may not complete";
+  } else if (yourDeaths === 0) {
+    riskTier = "✅ RISKLESS - Perfect, zero deaths even with max bad luck";
+  } else {
+    // Check if deaths were intentional (would happen in average case too)
+    // For now, mark all as "Risky" - we can refine this later
+    riskTier = `⚠️ RISKY ${yourDeaths} DEATH${
+      yourDeaths > 1 ? "S" : ""
+    } - Guaranteed win, possible ${yourDeaths} casualt${
+      yourDeaths > 1 ? "ies" : "y"
+    }`;
+  }
+
+  return {
+    strategy: strategy,
+    yourDeaths: yourDeaths,
+    enemyDeaths: enemyDeaths,
+    weWin: weWin,
+    weLose: weLose,
+    riskTier: riskTier,
+    finalState: currentState,
+  };
+}
+
 // ============================================================================
 // DATA LOADING AND INITIALIZATION
 // ============================================================================
@@ -631,6 +1002,10 @@ class BattleState {
       stats: calculateAllStats(p),
       currentHP: null, // Will be set after stats are calculated
       fainted: false,
+      status: null, // 'sleep', 'paralysis', 'burn', 'poison', 'freeze', 'toxic'
+      statusCounter: 0, // For sleep (1-3 turns), toxic counter, etc.
+      confusion: 0, // Confusion turns remaining (1-4)
+      hasSubstitute: false, // Substitute active
     }));
 
     this.enemyTeam = enemyTeam.map((p) => ({
@@ -638,6 +1013,10 @@ class BattleState {
       stats: calculateAllStats(p),
       currentHP: null,
       fainted: false,
+      status: null,
+      statusCounter: 0,
+      confusion: 0,
+      hasSubstitute: false,
     }));
 
     // Set current HP to max HP
@@ -827,6 +1206,208 @@ function generatePossibleActions(state, isPlayer) {
 // ============================================================================
 
 /**
+ * Apply status effect to a Pokemon
+ * @param {Object} pokemon - Pokemon to afflict
+ * @param {string} status - Status to apply ('sleep', 'paralysis', 'burn', 'poison', 'freeze', 'toxic')
+ * @param {Array} events - Events array to add messages to
+ * @returns {boolean} - True if status was applied
+ */
+function applyStatusEffect(pokemon, status, events) {
+  if (pokemon.status) {
+    events.push({
+      type: "status-fail",
+      text: `${capitalize(pokemon.name)} is already ${pokemon.status}!`,
+    });
+    return false;
+  }
+
+  pokemon.status = status;
+
+  if (status === "sleep") {
+    pokemon.statusCounter = Math.floor(Math.random() * 3) + 1; // 1-3 turns
+    events.push({
+      type: "status",
+      text: `${capitalize(pokemon.name)} fell asleep!`,
+    });
+  } else if (status === "paralysis") {
+    events.push({
+      type: "status",
+      text: `${capitalize(pokemon.name)} was paralyzed!`,
+    });
+  } else if (status === "burn") {
+    events.push({
+      type: "status",
+      text: `${capitalize(pokemon.name)} was burned!`,
+    });
+  } else if (status === "poison") {
+    events.push({
+      type: "status",
+      text: `${capitalize(pokemon.name)} was poisoned!`,
+    });
+  } else if (status === "toxic") {
+    pokemon.statusCounter = 1; // Toxic counter starts at 1
+    events.push({
+      type: "status",
+      text: `${capitalize(pokemon.name)} was badly poisoned!`,
+    });
+  } else if (status === "freeze") {
+    events.push({
+      type: "status",
+      text: `${capitalize(pokemon.name)} was frozen solid!`,
+    });
+  }
+
+  return true;
+}
+
+/**
+ * Check if Pokemon can move this turn (status prevention)
+ * @param {Object} pokemon - Pokemon attempting to move
+ * @param {Array} events - Events array to add messages to
+ * @param {boolean} worstCase - If true, assume worst outcomes (full para, no thaw, etc.)
+ * @returns {boolean} - True if Pokemon can move
+ */
+function canPokemonMove(pokemon, events, worstCase = false) {
+  // Check sleep
+  if (pokemon.status === "sleep") {
+    if (pokemon.statusCounter > 0) {
+      pokemon.statusCounter--;
+      events.push({
+        type: "status-prevent",
+        text: `${capitalize(pokemon.name)} is fast asleep!`,
+      });
+
+      if (pokemon.statusCounter === 0) {
+        pokemon.status = null;
+        events.push({
+          type: "status-cure",
+          text: `${capitalize(pokemon.name)} woke up!`,
+        });
+      }
+      return false;
+    }
+  }
+
+  // Check freeze
+  if (pokemon.status === "freeze") {
+    const thawChance = worstCase ? 0 : 0.2; // 20% chance to thaw normally
+    if (Math.random() >= thawChance) {
+      events.push({
+        type: "status-prevent",
+        text: `${capitalize(pokemon.name)} is frozen solid!`,
+      });
+      return false;
+    } else {
+      pokemon.status = null;
+      events.push({
+        type: "status-cure",
+        text: `${capitalize(pokemon.name)} thawed out!`,
+      });
+    }
+  }
+
+  // Check paralysis (25% chance to be fully paralyzed)
+  if (pokemon.status === "paralysis") {
+    const paraChance = worstCase ? 1.0 : 0.25;
+    if (Math.random() < paraChance) {
+      events.push({
+        type: "status-prevent",
+        text: `${capitalize(pokemon.name)} is fully paralyzed!`,
+      });
+      return false;
+    }
+  }
+
+  // Check confusion
+  if (pokemon.confusion > 0) {
+    pokemon.confusion--;
+    events.push({
+      type: "confusion",
+      text: `${capitalize(pokemon.name)} is confused!`,
+    });
+
+    const hurtSelfChance = worstCase ? 1.0 : 0.33; // 33% chance to hurt itself
+    if (Math.random() < hurtSelfChance) {
+      const confusionDamage = Math.floor(pokemon.stats.hp * 0.1); // ~10% HP
+      pokemon.currentHP = Math.max(0, pokemon.currentHP - confusionDamage);
+      events.push({
+        type: "confusion-damage",
+        text: `${capitalize(
+          pokemon.name
+        )} hurt itself in confusion! ${confusionDamage} damage.`,
+      });
+
+      if (pokemon.currentHP === 0) {
+        pokemon.fainted = true;
+        events.push({
+          type: "faint",
+          text: `${capitalize(pokemon.name)} fainted!`,
+        });
+      }
+      return false;
+    }
+
+    if (pokemon.confusion === 0) {
+      events.push({
+        type: "confusion-end",
+        text: `${capitalize(pokemon.name)} snapped out of confusion!`,
+      });
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Apply end-of-turn status damage
+ * @param {Object} pokemon - Pokemon to apply damage to
+ * @param {Array} events - Events array to add messages to
+ */
+function applyEndOfTurnStatus(pokemon, events) {
+  if (pokemon.fainted) return;
+
+  if (pokemon.status === "burn") {
+    const burnDamage = Math.floor(pokemon.stats.hp / 16); // 1/16 max HP
+    pokemon.currentHP = Math.max(0, pokemon.currentHP - burnDamage);
+    events.push({
+      type: "burn-damage",
+      text: `${capitalize(
+        pokemon.name
+      )} was hurt by its burn! ${burnDamage} damage.`,
+    });
+  } else if (pokemon.status === "poison") {
+    const poisonDamage = Math.floor(pokemon.stats.hp / 8); // 1/8 max HP
+    pokemon.currentHP = Math.max(0, pokemon.currentHP - poisonDamage);
+    events.push({
+      type: "poison-damage",
+      text: `${capitalize(
+        pokemon.name
+      )} was hurt by poison! ${poisonDamage} damage.`,
+    });
+  } else if (pokemon.status === "toxic") {
+    const toxicDamage = Math.floor(
+      (pokemon.stats.hp / 16) * pokemon.statusCounter
+    );
+    pokemon.currentHP = Math.max(0, pokemon.currentHP - toxicDamage);
+    pokemon.statusCounter++;
+    events.push({
+      type: "toxic-damage",
+      text: `${capitalize(
+        pokemon.name
+      )} was hurt by toxic! ${toxicDamage} damage.`,
+    });
+  }
+
+  if (pokemon.currentHP === 0 && !pokemon.fainted) {
+    pokemon.fainted = true;
+    events.push({
+      type: "faint",
+      text: `${capitalize(pokemon.name)} fainted!`,
+    });
+  }
+}
+
+/**
  * Simulate a turn and update battle state
  * @param {BattleState} state - Current battle state
  * @param {Object} yourAction - Your action
@@ -889,25 +1470,79 @@ function simulateTurn(state, yourAction, enemyAction) {
         )}!`,
       });
     } else if (action.type === "move") {
+      // Check if Pokemon can move (status effects)
+      if (!canPokemonMove(attacker, events, false)) {
+        return; // Pokemon can't move this turn
+      }
+
       // Execute move
       const move = action.move;
 
+      events.push({
+        type: "move-use",
+        isPlayer: isPlayer,
+        move: move,
+        text: `${capitalize(attacker.name)} used ${capitalize(move.name)}!`,
+      });
+
       if (move.damageClass === "status") {
-        events.push({
-          type: "move",
-          isPlayer: isPlayer,
-          move: move,
-          text: `${capitalize(attacker.name)} used ${capitalize(move.name)}!`,
-        });
+        // Status moves - apply effects
+        const moveName = move.name.toLowerCase();
+
+        if (
+          moveName === "hypnosis" ||
+          moveName === "sleep-powder" ||
+          moveName === "spore"
+        ) {
+          applyStatusEffect(defender, "sleep", events);
+        } else if (
+          moveName === "thunder-wave" ||
+          moveName === "stun-spore" ||
+          moveName === "glare"
+        ) {
+          applyStatusEffect(defender, "paralysis", events);
+        } else if (
+          moveName === "will-o-wisp" ||
+          moveName === "scald" ||
+          moveName === "flare-blitz"
+        ) {
+          applyStatusEffect(defender, "burn", events);
+        } else if (moveName === "poison-powder" || moveName === "poison-gas") {
+          applyStatusEffect(defender, "poison", events);
+        } else if (moveName === "toxic") {
+          applyStatusEffect(defender, "toxic", events);
+        } else if (
+          moveName === "confuse-ray" ||
+          moveName === "supersonic" ||
+          moveName === "swagger"
+        ) {
+          if (defender.confusion === 0) {
+            defender.confusion = Math.floor(Math.random() * 4) + 1; // 1-4 turns
+            events.push({
+              type: "confusion",
+              text: `${capitalize(defender.name)} became confused!`,
+            });
+          }
+        }
+        // Other status moves can be added here
       } else {
         // Damaging move
         const attackerStats = attacker.stats;
         const defenderStats = defender.stats;
+
+        // Modify attack stat if burned
+        const effectiveAttackerStats = { ...attackerStats };
+        if (attacker.status === "burn" && move.damageClass === "physical") {
+          effectiveAttackerStats.atk = Math.floor(
+            effectiveAttackerStats.atk / 2
+          );
+        }
+
         const damage = calculateDamage(
           attacker,
           defender,
           move,
-          attackerStats,
+          effectiveAttackerStats,
           defenderStats
         );
 
@@ -933,9 +1568,7 @@ function simulateTurn(state, yourAction, enemyAction) {
           move: move,
           damage: actualDamage,
           effectiveness: damage.effectiveness,
-          text: `${capitalize(attacker.name)} used ${capitalize(
-            move.name
-          )}! ${actualDamage} damage.${effectText}`,
+          text: `${actualDamage} damage.${effectText}`,
         });
 
         if (defender.fainted) {
@@ -949,6 +1582,10 @@ function simulateTurn(state, yourAction, enemyAction) {
       }
     }
   });
+
+  // Apply end-of-turn status damage
+  applyEndOfTurnStatus(state.getYourActive(), events);
+  applyEndOfTurnStatus(state.getEnemyActive(), events);
 
   return { state, events };
 }
@@ -1010,6 +1647,7 @@ function handleForcedSwitch(state, isPlayer) {
 /**
  * Evaluate a battle position
  * Returns a score where positive = good for player, negative = good for enemy
+ * CRITICAL: Prioritizes immediate KOs above all else
  * @param {BattleState} state - Battle state to evaluate
  * @returns {number} - Position score
  */
@@ -1020,8 +1658,81 @@ function evaluatePosition(state) {
   const yourAlive = state.yourTeam.filter((p) => !p.fainted).length;
   const enemyAlive = state.enemyTeam.filter((p) => !p.fainted).length;
 
-  // Heavy weight on Pokemon count (winning condition)
-  score += (yourAlive - enemyAlive) * 1000;
+  // MASSIVE weight on Pokemon count (winning condition)
+  score += (yourAlive - enemyAlive) * 5000;
+
+  // Check for immediate KO opportunities - this should be HIGHEST priority
+  if (yourAlive > 0 && enemyAlive > 0) {
+    const yourActive = state.getYourActive();
+    const enemyActive = state.getEnemyActive();
+
+    if (!yourActive.fainted && !enemyActive.fainted && yourActive.moveData) {
+      // Check if we can KO the enemy THIS TURN
+      let canKOEnemy = false;
+      let minDamageToKO = Infinity;
+
+      yourActive.moveData.forEach((move) => {
+        if (move.damageClass !== "status") {
+          const yourStats = yourActive.stats;
+          const enemyStats = enemyActive.stats;
+
+          const damage = calculateDamage(
+            yourActive,
+            enemyActive,
+            move,
+            yourStats,
+            enemyStats
+          );
+
+          // Check if minimum damage can KO
+          if (damage.min >= enemyActive.currentHP) {
+            canKOEnemy = true;
+            minDamageToKO = Math.min(minDamageToKO, damage.min);
+          }
+        }
+      });
+
+      // HUGE bonus for guaranteed KO - this should override almost everything
+      if (canKOEnemy) {
+        score += 10000;
+      }
+
+      // Check if enemy can KO us - HUGE penalty
+      if (enemyActive.moveData) {
+        let enemyCanKO = false;
+
+        enemyActive.moveData.forEach((move) => {
+          if (move.damageClass !== "status") {
+            const yourStats = yourActive.stats;
+            const enemyStats = enemyActive.stats;
+
+            const damage = calculateDamage(
+              enemyActive,
+              yourActive,
+              move,
+              enemyStats,
+              yourStats
+            );
+
+            // Include crit damage in calculation (1.5x)
+            const critDamage = Math.floor(damage.max * 1.5);
+
+            if (
+              damage.max >= yourActive.currentHP ||
+              critDamage >= yourActive.currentHP
+            ) {
+              enemyCanKO = true;
+            }
+          }
+        });
+
+        // Penalty for being in KO range (but not as bad as missing a KO opportunity)
+        if (enemyCanKO) {
+          score -= 3000;
+        }
+      }
+    }
+  }
 
   // Calculate total HP percentage
   let yourTotalHP = 0;
@@ -1042,17 +1753,17 @@ function evaluatePosition(state) {
   const yourHPPercent = yourMaxHP > 0 ? yourTotalHP / yourMaxHP : 0;
   const enemyHPPercent = enemyMaxHP > 0 ? enemyTotalHP / enemyMaxHP : 0;
 
-  // Weight HP advantage
-  score += (yourHPPercent - enemyHPPercent) * 200;
+  // Weight HP advantage (much less than KO opportunities)
+  score += (yourHPPercent - enemyHPPercent) * 500;
 
-  // Evaluate current matchup
+  // Evaluate current matchup (minor factor)
   if (yourAlive > 0 && enemyAlive > 0) {
     const yourActive = state.getYourActive();
     const enemyActive = state.getEnemyActive();
 
     if (!yourActive.fainted && !enemyActive.fainted) {
       const matchupScore = calculateSwitchInScore(yourActive, enemyActive);
-      score += matchupScore * 50;
+      score += matchupScore * 100;
     }
   }
 
@@ -1570,22 +2281,83 @@ function getHPClass(pokemon) {
  * @param {Array} timeline - Array of turn events
  * @param {Object} analysis - Battle analysis
  */
-function displayStrategyResults(timeline, analysis) {
+function displayStrategyResults(timeline, analysis, worstCaseTimeline) {
   const resultsSection = document.querySelector(".strategy-results-section");
   resultsSection.style.display = "block";
 
-  // Display summary stats
-  document.getElementById("riskLevel").textContent = analysis.riskLevel;
+  // Display worst-case risk tier prominently
+  const riskTierEl = document.getElementById("riskLevel");
+  if (analysis.worstCaseTier) {
+    // Display worst-case tier instead of simple risk level
+    riskTierEl.textContent = analysis.worstCaseTier;
+
+    // Set color based on tier
+    if (analysis.worstCaseTier.includes("RISKLESS")) {
+      riskTierEl.className = "stat-value risk-low";
+    } else if (analysis.worstCaseTier.includes("RISKY")) {
+      riskTierEl.className = "stat-value risk-medium";
+    } else if (analysis.worstCaseTier.includes("SACRIFICE")) {
+      riskTierEl.className = "stat-value risk-high";
+    } else {
+      riskTierEl.className = "stat-value risk-high";
+    }
+  } else {
+    riskTierEl.textContent = analysis.riskLevel;
+    riskTierEl.className = `stat-value risk-${analysis.riskLevel.toLowerCase()}`;
+  }
+
+  // Display death comparison
   document.getElementById(
-    "riskLevel"
-  ).className = `stat-value risk-${analysis.riskLevel.toLowerCase()}`;
-  document.getElementById("expectedDeaths").textContent =
-    analysis.expectedDeaths;
+    "expectedDeaths"
+  ).textContent = `${analysis.expectedDeaths} avg / ${analysis.worstCaseDeaths} worst`;
   document.getElementById("turnCount").textContent = analysis.turnCount;
 
-  // Display timeline
+  // Display timeline with collapsible sections
   const timelineEl = document.getElementById("strategyTimeline");
   timelineEl.innerHTML = "";
+
+  // Add comparison header
+  const comparisonHeader = document.createElement("div");
+  comparisonHeader.style.cssText =
+    "background: #1e1e1e; padding: 15px; margin-bottom: 15px; border-radius: 8px;";
+  comparisonHeader.innerHTML = `
+    <h3 style="margin: 0 0 10px 0; color: #fff;">Battle Strategy Comparison</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+      <div style="background: #2d2d30; padding: 10px; border-radius: 5px;">
+        <strong style="color: #4ec9b0;">Average Case:</strong>
+        <div>${analysis.expectedDeaths} deaths${
+    analysis.victory ? ", Victory ✅" : ""
+  }</div>
+      </div>
+      <div style="background: #2d2d30; padding: 10px; border-radius: 5px;">
+        <strong style="color: #ff6b6b;">Worst Case:</strong>
+        <div>${analysis.worstCaseDeaths} deaths${
+    analysis.worstCaseWin
+      ? ", Victory ✅"
+      : analysis.worstCaseLoss
+      ? ", Loss ❌"
+      : ""
+  }</div>
+      </div>
+    </div>
+  `;
+  timelineEl.appendChild(comparisonHeader);
+
+  // Average Case Section (collapsible)
+  const avgCaseSection = document.createElement("div");
+  avgCaseSection.style.cssText = "margin-bottom: 20px;";
+
+  const avgCaseHeader = document.createElement("div");
+  avgCaseHeader.style.cssText =
+    "background: #2d2d30; padding: 12px; cursor: pointer; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;";
+  avgCaseHeader.innerHTML = `
+    <strong style="color: #4ec9b0; font-size: 16px;">📊 Average Case Scenario (${analysis.expectedDeaths} deaths)</strong>
+    <span id="avgToggle" style="font-size: 20px;">▼</span>
+  `;
+
+  const avgCaseContent = document.createElement("div");
+  avgCaseContent.id = "avgCaseContent";
+  avgCaseContent.style.cssText = "margin-top: 10px;";
 
   timeline.forEach((step, index) => {
     const stepEl = document.createElement("div");
@@ -1662,8 +2434,77 @@ function displayStrategyResults(timeline, analysis) {
       </div>
     `;
 
-    timelineEl.appendChild(stepEl);
+    avgCaseContent.appendChild(stepEl);
   });
+
+  avgCaseHeader.addEventListener("click", () => {
+    const content = avgCaseContent;
+    const toggle = document.getElementById("avgToggle");
+    if (content.style.display === "none") {
+      content.style.display = "block";
+      toggle.textContent = "▼";
+    } else {
+      content.style.display = "none";
+      toggle.textContent = "▶";
+    }
+  });
+
+  avgCaseSection.appendChild(avgCaseHeader);
+  avgCaseSection.appendChild(avgCaseContent);
+  timelineEl.appendChild(avgCaseSection);
+
+  // Worst Case Section (collapsible, expanded by default)
+  if (worstCaseTimeline) {
+    const worstCaseSection = document.createElement("div");
+    worstCaseSection.style.cssText = "margin-bottom: 20px;";
+
+    const worstCaseHeader = document.createElement("div");
+    worstCaseHeader.style.cssText =
+      "background: #3d2d2d; padding: 12px; cursor: pointer; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;";
+    worstCaseHeader.innerHTML = `
+      <strong style="color: #ff6b6b; font-size: 16px;">💀 Worst Case Scenario (${analysis.worstCaseDeaths} deaths)</strong>
+      <span id="worstToggle" style="font-size: 20px;">▼</span>
+    `;
+
+    const worstCaseContent = document.createElement("div");
+    worstCaseContent.id = "worstCaseContent";
+    worstCaseContent.style.cssText = "margin-top: 10px;";
+
+    worstCaseTimeline.forEach((step) => {
+      const stepEl = document.createElement("div");
+      stepEl.className = "timeline-step";
+      stepEl.style.cssText = "border-left: 3px solid #ff6b6b;";
+
+      stepEl.innerHTML = `
+        <div class="step-header">
+          <span class="step-number">Turn ${step.turn}</span>
+          <span class="step-action">${step.action}</span>
+        </div>
+        <div class="step-details">
+          ${step.details}
+          <span class="step-risk worst-case" style="background: #d32f2f;">Worst Case</span>
+        </div>
+      `;
+
+      worstCaseContent.appendChild(stepEl);
+    });
+
+    worstCaseHeader.addEventListener("click", () => {
+      const content = worstCaseContent;
+      const toggle = document.getElementById("worstToggle");
+      if (content.style.display === "none") {
+        content.style.display = "block";
+        toggle.textContent = "▼";
+      } else {
+        content.style.display = "none";
+        toggle.textContent = "▶";
+      }
+    });
+
+    worstCaseSection.appendChild(worstCaseHeader);
+    worstCaseSection.appendChild(worstCaseContent);
+    timelineEl.appendChild(worstCaseSection);
+  }
 }
 
 // ============================================================================
@@ -1929,10 +2770,107 @@ function selectEnemyAction(state) {
 }
 
 /**
+ * Explain why an action was chosen
+ * @param {BattleState} state - Current battle state
+ * @param {Object} action - Action being taken
+ * @param {boolean} isPlayer - True if player action
+ * @returns {string} - Explanation text
+ */
+function explainAction(state, action, isPlayer) {
+  if (!isPlayer) return ""; // Only explain player actions
+
+  const yourActive = state.getYourActive();
+  const enemyActive = state.getEnemyActive();
+
+  if (action.type === "switch") {
+    const switchTarget = action.pokemon;
+    const matchupScore = calculateSwitchInScore(switchTarget, enemyActive);
+
+    if (matchupScore >= 4) {
+      return `💡 Switching to ${capitalize(
+        switchTarget.name
+      )} for a favorable matchup (faster and can 2HKO+)`;
+    } else if (matchupScore >= 2) {
+      return `💡 Switching to ${capitalize(
+        switchTarget.name
+      )} for better positioning`;
+    } else if (matchupScore <= -1) {
+      return `⚠️ Defensive switch to ${capitalize(
+        switchTarget.name
+      )} to avoid OHKO`;
+    } else {
+      return `Switching to ${capitalize(switchTarget.name)}`;
+    }
+  } else if (action.type === "move" && action.move.damageClass !== "status") {
+    // Check if this move secures a KO
+    const yourStats = yourActive.stats;
+    const enemyStats = enemyActive.stats;
+    const damage = calculateDamage(
+      yourActive,
+      enemyActive,
+      action.move,
+      yourStats,
+      enemyStats
+    );
+
+    if (damage.min >= enemyActive.currentHP) {
+      return `✅ GUARANTEED KO - ${capitalize(action.move.name)} deals ${
+        damage.min
+      }-${damage.max} damage vs ${enemyActive.currentHP} HP`;
+    } else if (damage.average >= enemyActive.currentHP) {
+      return `🎯 LIKELY KO - ${capitalize(
+        action.move.name
+      )} averages ${Math.floor(damage.average)} damage vs ${
+        enemyActive.currentHP
+      } HP`;
+    } else if (damage.max >= enemyActive.currentHP) {
+      return `🎲 POSSIBLE KO - ${capitalize(action.move.name)} max rolls ${
+        damage.max
+      } vs ${enemyActive.currentHP} HP`;
+    } else {
+      const damagePercent = Math.floor(
+        (damage.average / enemyActive.currentHP) * 100
+      );
+      return `📊 Chip damage - ${capitalize(
+        action.move.name
+      )} deals ~${damagePercent}% (${Math.floor(damage.average)} damage)`;
+    }
+  } else if (action.type === "move") {
+    // Status move
+    const moveName = action.move.name.toLowerCase();
+    if (
+      moveName === "hypnosis" ||
+      moveName === "sleep-powder" ||
+      moveName === "spore"
+    ) {
+      return `💤 Status move - Putting ${capitalize(
+        enemyActive.name
+      )} to sleep`;
+    } else if (moveName === "thunder-wave" || moveName === "stun-spore") {
+      return `⚡ Status move - Paralyzing ${capitalize(
+        enemyActive.name
+      )} (speed cut, 25% para chance)`;
+    } else if (moveName === "will-o-wisp") {
+      return `🔥 Status move - Burning ${capitalize(
+        enemyActive.name
+      )} (halves attack)`;
+    } else if (moveName === "toxic") {
+      return `☠️ Status move - Badly poisoning ${capitalize(
+        enemyActive.name
+      )} (increasing damage)`;
+    } else {
+      return `Using ${capitalize(action.move.name)}`;
+    }
+  }
+
+  return "";
+}
+
+/**
  * Find optimal strategy path with minimal risk
  * @param {BattleState} initialState - Starting state
  * @param {number} maxDepth - Maximum turns to look ahead
- * @returns {Array} - Array of {turn, action, risk} objects
+ * @returns {Array} - Array of {turn, action, risk, reasoning} objects
  */
 function findOptimalStrategy(initialState, maxDepth = 10) {
   const strategy = [];
@@ -1955,6 +2893,9 @@ function findOptimalStrategy(initialState, maxDepth = 10) {
     const yourAction = yourResult.action;
 
     if (!yourAction) break;
+
+    // Generate reasoning for this action
+    const reasoning = explainAction(currentState, yourAction, true);
 
     // Enemy uses simple AI (no lookahead, follows move selection rules)
     const enemyAction = selectEnemyAction(currentState);
@@ -1985,6 +2926,7 @@ function findOptimalStrategy(initialState, maxDepth = 10) {
       action: yourAction,
       events: result.events,
       risk: risk,
+      reasoning: reasoning,
       state: currentState.clone(),
     });
   }
@@ -2044,6 +2986,10 @@ async function calculateStrategy() {
 
     const strategy = findOptimalStrategy(initialState, 20);
 
+    // Step 4.5: Run worst-case scenario analysis
+    console.log("Running worst-case scenario analysis...");
+    const worstCase = calculateWorstCaseStrategy(initialState, 20);
+
     // Convert strategy to timeline format
     const timeline = strategy.map((step) => {
       const action = step.action;
@@ -2051,6 +2997,10 @@ async function calculateStrategy() {
         action.type === "move"
           ? `Use ${capitalize(action.move.name)}`
           : `Switch to ${capitalize(action.pokemon.name)}`;
+
+      const reasoningText = step.reasoning
+        ? `<p style="background: #2d3748; padding: 8px; border-left: 3px solid #4299e1; margin: 5px 0;"><strong style="color: #4299e1;">Why this action?</strong><br>${step.reasoning}</p>`
+        : "";
 
       const riskReasons =
         step.risk.reasons.length > 0
@@ -2061,11 +3011,35 @@ async function calculateStrategy() {
         turn: step.turn,
         action: actionText,
         details:
-          step.events.map((e) => `<p>${e.text}</p>`).join("") + riskReasons,
+          reasoningText +
+          step.events.map((e) => `<p>${e.text}</p>`).join("") +
+          riskReasons,
         risk: step.risk.level,
         critRisks: step.risk.critRisks || [],
         statusRisks: step.risk.statusRisks || [],
         aiMoveAnalysis: step.risk.aiMoveAnalysis || {},
+      };
+    });
+
+    // Convert worst-case strategy to timeline format
+    const worstCaseTimeline = worstCase.strategy.map((step) => {
+      const action = step.action;
+      const actionText =
+        action.type === "move"
+          ? `Use ${capitalize(action.move.name)}`
+          : `Switch to ${capitalize(action.pokemon.name)}`;
+
+      let deathText = "";
+      if (step.yourDeathsThisTurn > 0) {
+        deathText = `<p style="color: #d32f2f; font-weight: bold;">💀 ${step.yourDeathsThisTurn} of your Pokémon fainted this turn!</p>`;
+      }
+
+      return {
+        turn: step.turn,
+        action: actionText,
+        details:
+          step.events.map((e) => `<p>${e.text}</p>`).join("") + deathText,
+        risk: "worst-case",
       };
     });
 
@@ -2090,10 +3064,14 @@ async function calculateStrategy() {
       expectedDeaths: yourDeaths,
       turnCount: currentState.turnCount,
       victory: enemyAlive === 0,
+      worstCaseDeaths: worstCase.yourDeaths,
+      worstCaseWin: worstCase.weWin,
+      worstCaseLoss: worstCase.weLose,
+      worstCaseTier: worstCase.riskTier,
     };
 
-    // Display results
-    displayStrategyResults(timeline, analysis);
+    // Display results with both timelines
+    displayStrategyResults(timeline, analysis, worstCaseTimeline);
 
     hideLoading();
 
