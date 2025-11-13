@@ -11,6 +11,9 @@ let currentCustomizePokemon = null;
 const showdownInput = document.getElementById("showdownInput");
 const importBtn = document.getElementById("importBtn");
 const clearBoxBtn = document.getElementById("clearBoxBtn");
+const enemyShowdownInput = document.getElementById("enemyShowdownInput");
+const importEnemyBtn = document.getElementById("importEnemyBtn");
+const clearEnemyBtn = document.getElementById("clearEnemyBtn");
 const pokemonBoxEl = document.getElementById("pokemonBox");
 const pokemonTeamEl = document.getElementById("pokemonTeam");
 const messageBox = document.getElementById("messageBox");
@@ -24,6 +27,8 @@ const saveCustomizeBtn = document.getElementById("saveCustomizeBtn");
 // Event Listeners
 importBtn.addEventListener("click", importShowdown);
 clearBoxBtn.addEventListener("click", clearBox);
+importEnemyBtn.addEventListener("click", importEnemyShowdown);
+clearEnemyBtn.addEventListener("click", clearEnemyTeam);
 closeDetailBtn.addEventListener("click", closeDetailPanel);
 closeCustomizeBtn.addEventListener("click", closeCustomizePanel);
 saveCustomizeBtn.addEventListener("click", saveCustomization);
@@ -81,6 +86,70 @@ async function importShowdown() {
       "Failed to import Pokemon. Check the format and try again.",
       "error"
     );
+  }
+}
+
+// Import Enemy Pokemon from Showdown format
+async function importEnemyShowdown() {
+  const showdownText = enemyShowdownInput.value.trim();
+
+  if (!showdownText) {
+    showMessage("Please paste enemy Pokemon data in Showdown format", "error");
+    return;
+  }
+
+  showMessage("Importing enemy Pokemon...", "loading");
+
+  try {
+    const response = await fetch("/api/parse-showdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ showdownText }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to parse Pokemon data");
+    }
+
+    const data = await response.json();
+
+    // Add to enemy team (max 6)
+    let addedCount = 0;
+    for (let i = 0; i < data.pokemon.length && i < 6; i++) {
+      if (
+        enemyTeam[i] === null ||
+        confirm(
+          `Replace ${capitalize(enemyTeam[i]?.name || "")} in slot ${i + 1}?`
+        )
+      ) {
+        enemyTeam[i] = data.pokemon[i];
+        addedCount++;
+      }
+    }
+
+    renderEnemyTeam();
+    saveTeamsToLocalStorage();
+    showMessage(
+      `Successfully imported ${addedCount} enemy Pokemon!`,
+      "success"
+    );
+    enemyShowdownInput.value = "";
+  } catch (error) {
+    console.error("Import error:", error);
+    showMessage(
+      "Failed to import enemy Pokemon. Check the format and try again.",
+      "error"
+    );
+  }
+}
+
+// Clear Enemy Team
+function clearEnemyTeam() {
+  if (confirm("Are you sure you want to clear the entire enemy team?")) {
+    enemyTeam = [null, null, null, null, null, null];
+    renderEnemyTeam();
+    saveTeamsToLocalStorage();
+    showMessage("Enemy team cleared", "success");
   }
 }
 

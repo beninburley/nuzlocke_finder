@@ -82,6 +82,28 @@ IVs: 7 HP / 4 Atk / 12 Def / 1 SpA / 8 SpD / 30 Spe
         </div>
       </div>
 
+      <!-- Enemy Team Import Section -->
+      <div class="import-section">
+        <h2>Import Enemy Team (Showdown Format)</h2>
+        <textarea
+          id="enemyShowdownInput"
+          placeholder="Paste enemy Pokemon Showdown script here...
+
+Example:
+Rapidash-Galar @ Weakness Policy
+Ability: Pastel Veil
+Level: 38
+Timid Nature
+IVs: 20 HP / 25 Atk / 20 Def / 25 SpA / 20 SpD / 25 Spe
+- Play Rough
+- Smart Strike
+- Megahorn
+- Fairy Wind"
+        ></textarea>
+        <button id="importEnemyBtn">Import Enemy Team</button>
+        <button id="clearEnemyBtn">Clear Enemy Team</button>
+      </div>
+
       <!-- Enemy Team Section -->
       <div class="enemy-team-section">
         <h2>Enemy Team (<span id="enemyTeamCount">0</span>/6)</h2>
