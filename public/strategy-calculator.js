@@ -215,11 +215,24 @@ async function calculateStrategy() {
         deathText = `<p style="color: #d32f2f; font-weight: bold;">💀 ${step.yourDeathsThisTurn} of your Pokémon fainted this turn!</p>`;
       }
 
+      // Add HP status at end of turn
+      const hpText = `<p style="background: #1a202c; padding: 6px; margin-top: 8px; border-left: 3px solid #4299e1;">
+        <strong>End of Turn HP:</strong><br>
+        <span style="color: #48bb78;">Your ${capitalize(
+          step.yourActiveName
+        )}: ${step.yourActiveHP}/${step.yourActiveMaxHP} HP</span><br>
+        <span style="color: #f56565;">Enemy ${capitalize(
+          step.enemyActiveName
+        )}: ${step.enemyActiveHP}/${step.enemyActiveMaxHP} HP</span>
+      </p>`;
+
       return {
         turn: step.turn,
         action: actionText,
         details:
-          step.events.map((e) => `<p>${e.text}</p>`).join("") + deathText,
+          step.events.map((e) => `<p>${e.text}</p>`).join("") +
+          deathText +
+          hpText,
         risk: "worst-case",
       };
     });

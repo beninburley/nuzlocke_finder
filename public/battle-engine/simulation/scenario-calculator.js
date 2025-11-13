@@ -83,6 +83,10 @@ export function calculateWorstCaseStrategy(
       if (switchEvent) result.events.push(switchEvent);
     }
 
+    // Capture HP after turn
+    const yourActiveAfter = currentState.getYourActive();
+    const enemyActiveAfter = currentState.getEnemyActive();
+
     strategy.push({
       turn: currentState.turnCount,
       action: yourAction,
@@ -90,6 +94,12 @@ export function calculateWorstCaseStrategy(
       state: currentState.clone(),
       yourDeathsThisTurn: yourDeathsThisTurn,
       enemyDeathsThisTurn: enemyDeathsThisTurn,
+      yourActiveHP: yourActiveAfter.fainted ? 0 : yourActiveAfter.currentHP,
+      yourActiveMaxHP: yourActiveAfter.stats.hp,
+      yourActiveName: yourActiveAfter.name,
+      enemyActiveHP: enemyActiveAfter.fainted ? 0 : enemyActiveAfter.currentHP,
+      enemyActiveMaxHP: enemyActiveAfter.stats.hp,
+      enemyActiveName: enemyActiveAfter.name,
     });
   }
 
