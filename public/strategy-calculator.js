@@ -33,6 +33,11 @@ import { selectEnemyAction } from "./battle-engine/ai/enemy-ai.js";
 import { findBestActionWithLookahead } from "./battle-engine/ai/lookahead-ai.js";
 import { evaluatePosition } from "./battle-engine/strategy/position-evaluator.js";
 import { explainAction } from "./battle-engine/strategy/action-explainer.js";
+import {
+  fetchMoveData,
+  loadAllMoveData,
+  attachMoveData,
+} from "./battle-engine/data/move-fetcher.js";
 
 // ============================================================================
 // STATE MANAGEMENT
@@ -336,99 +341,6 @@ function hideLoading() {
 
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-// ============================================================================
-// MOVE DATA FETCHING
-// ============================================================================
-
-/**
- * Fetch move data from API
- * @param {string} moveName - Name of the move
- * @returns {Promise<Object>} - Move data including power, type, accuracy, damageClass
- */
-async function fetchMoveData(moveName) {
-  if (!moveName) return null;
-
-  try {
-    const response = await fetch(
-      `/api/move/${moveName.toLowerCase().replace(/\s+/g, "-")}`
-    );
-
-    if (!response.ok) {
-      console.warn(`Move not found: ${moveName}`);
-      return null;
-    }
-
-    const moveData = await response.json();
-    return moveData;
-  } catch (error) {
-    console.error(`Error fetching move ${moveName}:`, error);
-    return null;
-  }
-}
-
-/**
- * Load all move data for both teams
- * @returns {Promise<Object>} - Object with move data for all moves
- */
-async function loadAllMoveData() {
-  const allMoves = new Set();
-
-  // Collect all unique move names from both teams
-  [...yourTeam, ...enemyTeam].forEach((pokemon) => {
-    if (pokemon && pokemon.moves) {
-      pokemon.moves.forEach((move) => {
-        if (move && move.trim()) {
-          allMoves.add(move.toLowerCase().trim());
-        }
-      });
-    }
-  });
-
-  // Fetch all move data in parallel
-  const moveDataMap = {};
-  const fetchPromises = Array.from(allMoves).map(async (moveName) => {
-    const data = await fetchMoveData(moveName);
-    if (data) {
-      moveDataMap[moveName] = data;
-    }
-  });
-
-  await Promise.all(fetchPromises);
-
-  console.log(`Loaded ${Object.keys(moveDataMap).length} moves from API`);
-  return moveDataMap;
-}
-
-/**
- * Attach move data to Pokemon
- * @param {Object} pokemon - Pokemon object
- * @param {Object} moveDataMap - Map of move names to move data
- */
-function attachMoveData(pokemon, moveDataMap) {
-  if (!pokemon || !pokemon.moves) return;
-
-  pokemon.moveData = pokemon.moves
-    .filter((move) => move && move.trim())
-    .map((moveName) => {
-      const normalizedName = moveName.toLowerCase().trim();
-      const data = moveDataMap[normalizedName];
-
-      if (!data) {
-        console.warn(`No data found for move: ${moveName}`);
-        return {
-          name: moveName,
-          type: "normal",
-          power: 0,
-          accuracy: 100,
-          damageClass: "status",
-          priority: 0,
-        };
-      }
-
-      return data;
-    });
 }
 
 // ============================================================================
@@ -1592,7 +1504,7 @@ async function calculateStrategy() {
   try {
     // Step 1: Load all move data
     console.log("Loading move data...");
-    const moveDataMap = await loadAllMoveData();
+    const moveDataMap = await loadAllMoveData(yourTeam, enemyTeam);
 
     // Step 2: Attach move data to all Pokemon
     [...yourTeam, ...enemyTeam].forEach((pokemon) => {
