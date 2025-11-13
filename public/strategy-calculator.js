@@ -48,10 +48,10 @@ import {
   hideLoading,
 } from "./battle-engine/ui/battle-formatter.js";
 import { displayStrategyResults } from "./battle-engine/ui/strategy-display.js";
-import { calculateWorstCaseStrategy } from "./battle-engine/simulation/scenario-calculator.js";
+// calculateWorstCaseStrategy removed - now using worst-case from tiered search
 import { handleForcedSwitch } from "./battle-engine/simulation/switch-handler.js";
 import { calculateActionRisk } from "./battle-engine/strategy/risk-calculator.js";
-import { findOptimalStrategy } from "./battle-engine/strategy/strategy-optimizer.js";
+import { findTieredStrategy } from "./battle-engine/strategy/tiered-strategy-search.js";
 
 // ============================================================================
 // STATE MANAGEMENT
@@ -153,23 +153,45 @@ async function calculateStrategy() {
     // Display initial battle state
     displayBattleState(initialState);
 
-    // Step 4: Run optimized battle simulation with lookahead
-    console.log("Running optimized battle simulation with lookahead...");
+    // Step 4: Run tiered strategy search (5 turns ahead)
+    console.log("Running tiered strategy search...");
 
-    const strategy = findOptimalStrategy(
+    const strategyResult = findTieredStrategy(
       initialState,
-      20,
-      calculateActionRisk,
+      5,
       handleForcedSwitch
     );
 
-    // Step 4.5: Run worst-case scenario analysis
-    console.log("Running worst-case scenario analysis...");
-    const worstCase = calculateWorstCaseStrategy(
-      initialState,
-      20,
-      handleForcedSwitch
-    );
+    const strategy = strategyResult.strategy;
+
+    // Worst-case scenario already calculated during tiered search validation
+    console.log("Using worst-case scenario from strategy validation...");
+
+    // Format worst-case to match expected structure
+    const worstCaseStrategy = strategyResult.worstCaseStrategy || [];
+    const worstCase = {
+      strategy: worstCaseStrategy,
+      yourDeaths: strategyResult.worstCaseDeaths || 0,
+      enemyDeaths:
+        worstCaseStrategy.length > 0
+          ? worstCaseStrategy[
+              worstCaseStrategy.length - 1
+            ].state.enemyTeam.filter((p) => p.fainted).length
+          : 0,
+      weWin:
+        worstCaseStrategy.length > 0
+          ? worstCaseStrategy[
+              worstCaseStrategy.length - 1
+            ].state.enemyTeam.filter((p) => !p.fainted).length === 0
+          : false,
+      weLose:
+        worstCaseStrategy.length > 0
+          ? worstCaseStrategy[
+              worstCaseStrategy.length - 1
+            ].state.yourTeam.filter((p) => !p.fainted).length === 0
+          : false,
+      riskTier: strategyResult.riskTier || "Unknown",
+    };
 
     // Convert strategy to timeline format
     const timeline = strategy.map((step) => {
@@ -179,26 +201,17 @@ async function calculateStrategy() {
           ? `Use ${capitalize(action.move.name)}`
           : `Switch to ${capitalize(action.pokemon.name)}`;
 
-      const reasoningText = step.reasoning
-        ? `<p style="background: #2d3748; padding: 8px; border-left: 3px solid #4299e1; margin: 5px 0;"><strong style="color: #4299e1;">Why this action?</strong><br>${step.reasoning}</p>`
-        : "";
-
-      const riskReasons =
-        step.risk.reasons.length > 0
-          ? `<p><strong>Risks:</strong> ${step.risk.reasons.join(", ")}</p>`
-          : "";
+      let deathText = "";
+      if (step.deathsThisTurn > 0) {
+        deathText = `<p style="color: #d32f2f; font-weight: bold;">💀 ${step.deathsThisTurn} of your Pokémon fainted this turn!</p>`;
+      }
 
       return {
         turn: step.turn,
         action: actionText,
         details:
-          reasoningText +
-          step.events.map((e) => `<p>${e.text}</p>`).join("") +
-          riskReasons,
-        risk: step.risk.level,
-        critRisks: step.risk.critRisks || [],
-        statusRisks: step.risk.statusRisks || [],
-        aiMoveAnalysis: step.risk.aiMoveAnalysis || {},
+          step.events.map((e) => `<p>${e.text}</p>`).join("") + deathText,
+        risk: "optimal",
       };
     });
 
@@ -254,14 +267,16 @@ async function calculateStrategy() {
     else if (yourDeaths >= 1) riskLevel = "Medium";
 
     const analysis = {
-      riskLevel: riskLevel,
-      expectedDeaths: yourDeaths,
+      riskLevel: strategyResult.riskTier,
+      expectedDeaths: strategyResult.averageDeaths,
       turnCount: currentState.turnCount,
       victory: enemyAlive === 0,
       worstCaseDeaths: worstCase.yourDeaths,
       worstCaseWin: worstCase.weWin,
       worstCaseLoss: worstCase.weLose,
       worstCaseTier: worstCase.riskTier,
+      optimalTier: strategyResult.riskTier,
+      turnsToWin: strategyResult.turnsToWin,
     };
 
     // Display results with both timelines
