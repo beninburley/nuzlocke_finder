@@ -42,9 +42,20 @@ export function calculateDamage(
   const power = move.power;
 
   // Determine if physical or special
-  const isPhysical = move.damageClass === "physical";
-  const attackStat = isPhysical ? attackerStats.atk : attackerStats.spa;
-  const defenseStat = isPhysical ? defenderStats.def : defenderStats.spd;
+  // Handle both string and object format for damageClass
+  const damageClass =
+    typeof move.damageClass === "string"
+      ? move.damageClass
+      : move.damage_class?.name || move.damageClass?.name || "physical";
+  const isPhysical = damageClass === "physical";
+
+  // Handle both abbreviated (atk, spa) and full names (attack, specialAttack)
+  const attackStat = isPhysical
+    ? attackerStats.atk || attackerStats.attack
+    : attackerStats.spa || attackerStats.specialAttack;
+  const defenseStat = isPhysical
+    ? defenderStats.def || defenderStats.defense
+    : defenderStats.spd || defenderStats.specialDefense;
 
   // Base damage calculation
   const baseDamage = Math.floor(
@@ -54,12 +65,14 @@ export function calculateDamage(
 
   // STAB (Same Type Attack Bonus) - 1.5x if move type matches attacker type
   let stab = 1;
-  if (attacker.types.includes(move.type)) {
+  const moveType =
+    typeof move.type === "string" ? move.type : move.type?.name || "normal";
+  if (attacker.types.includes(moveType)) {
     stab = 1.5;
   }
 
   // Type effectiveness
-  const effectiveness = getTypeEffectiveness(move.type, defender.types);
+  const effectiveness = getTypeEffectiveness(moveType, defender.types);
 
   // Random multiplier (85% - 100%)
   const minRandom = 0.85;

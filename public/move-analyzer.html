@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Move Analyzer - Pokémon Battle Analysis</title>
+    <link rel="stylesheet" href="move-analyzer.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Move Analyzer</h1>
+        <p>Analyze your battle decisions like a chess engine</p>
+        <a href="index.html" class="back-link">← Back to Home</a>
+      </header>
+
+      <!-- Team Selection Phase -->
+      <div id="team-selection" class="phase active">
+        <h2>Team Setup</h2>
+
+        <div class="teams-container">
+          <!-- Player Team -->
+          <div class="team-section">
+            <h3>Your Team</h3>
+            <div id="player-team-slots" class="team-slots">
+              <div class="team-slot empty" data-slot="0">
+                <span class="slot-number">1</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="1">
+                <span class="slot-number">2</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="2">
+                <span class="slot-number">3</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="3">
+                <span class="slot-number">4</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="4">
+                <span class="slot-number">5</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="5">
+                <span class="slot-number">6</span>
+                <button class="add-pokemon">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Enemy Team -->
+          <div class="team-section">
+            <h3>Enemy Team</h3>
+            <div id="enemy-team-slots" class="team-slots">
+              <div class="team-slot empty" data-slot="0">
+                <span class="slot-number">1</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="1">
+                <span class="slot-number">2</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="2">
+                <span class="slot-number">3</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="3">
+                <span class="slot-number">4</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="4">
+                <span class="slot-number">5</span>
+                <button class="add-pokemon">+</button>
+              </div>
+              <div class="team-slot empty" data-slot="5">
+                <span class="slot-number">6</span>
+                <button class="add-pokemon">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pokémon Search Modal -->
+        <div id="pokemon-modal" class="modal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>Select Pokémon</h3>
+              <button class="close-modal">&times;</button>
+            </div>
+            <input
+              type="text"
+              id="pokemon-search"
+              placeholder="Search Pokémon..."
+            />
+            <div id="pokemon-results" class="pokemon-results"></div>
+          </div>
+        </div>
+
+        <!-- Pokémon Customization Panel -->
+        <div id="customize-panel" class="customize-panel" style="display: none">
+          <div class="customize-header">
+            <h2 id="customize-name"></h2>
+            <button id="close-customize-btn">&times;</button>
+          </div>
+          <div class="customize-content">
+            <div class="customize-image">
+              <img id="customize-sprite" src="" alt="Pokemon sprite" />
+            </div>
+
+            <div class="customize-form">
+              <div class="form-group">
+                <label for="customize-level">Level:</label>
+                <input
+                  type="number"
+                  id="customize-level"
+                  min="1"
+                  max="100"
+                  value="50"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="customize-nature">Nature:</label>
+                <select id="customize-nature">
+                  <option value="Hardy">Hardy</option>
+                  <option value="Lonely">Lonely</option>
+                  <option value="Brave">Brave</option>
+                  <option value="Adamant">Adamant</option>
+                  <option value="Naughty">Naughty</option>
+                  <option value="Bold">Bold</option>
+                  <option value="Docile">Docile</option>
+                  <option value="Relaxed">Relaxed</option>
+                  <option value="Impish">Impish</option>
+                  <option value="Lax">Lax</option>
+                  <option value="Timid">Timid</option>
+                  <option value="Hasty">Hasty</option>
+                  <option value="Serious">Serious</option>
+                  <option value="Jolly">Jolly</option>
+                  <option value="Naive">Naive</option>
+                  <option value="Modest">Modest</option>
+                  <option value="Mild">Mild</option>
+                  <option value="Quiet">Quiet</option>
+                  <option value="Bashful">Bashful</option>
+                  <option value="Rash">Rash</option>
+                  <option value="Calm">Calm</option>
+                  <option value="Gentle">Gentle</option>
+                  <option value="Sassy">Sassy</option>
+                  <option value="Careful">Careful</option>
+                  <option value="Quirky">Quirky</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="customize-ability">Ability:</label>
+                <input
+                  type="text"
+                  id="customize-ability"
+                  placeholder="e.g., Intimidate"
+                />
+              </div>
+
+              <div class="form-section">
+                <h3>IVs (Individual Values)</h3>
+                <div class="stat-grid">
+                  <div class="stat-input">
+                    <label>HP:</label>
+                    <input
+                      type="number"
+                      id="iv-hp"
+                      min="0"
+                      max="31"
+                      value="31"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>Atk:</label>
+                    <input
+                      type="number"
+                      id="iv-atk"
+                      min="0"
+                      max="31"
+                      value="31"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>Def:</label>
+                    <input
+                      type="number"
+                      id="iv-def"
+                      min="0"
+                      max="31"
+                      value="31"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>SpA:</label>
+                    <input
+                      type="number"
+                      id="iv-spa"
+                      min="0"
+                      max="31"
+                      value="31"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>SpD:</label>
+                    <input
+                      type="number"
+                      id="iv-spd"
+                      min="0"
+                      max="31"
+                      value="31"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>Spe:</label>
+                    <input
+                      type="number"
+                      id="iv-spe"
+                      min="0"
+                      max="31"
+                      value="31"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <h3>EVs (Effort Values)</h3>
+                <div class="stat-grid">
+                  <div class="stat-input">
+                    <label>HP:</label>
+                    <input
+                      type="number"
+                      id="ev-hp"
+                      min="0"
+                      max="252"
+                      step="4"
+                      value="0"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>Atk:</label>
+                    <input
+                      type="number"
+                      id="ev-atk"
+                      min="0"
+                      max="252"
+                      step="4"
+                      value="0"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>Def:</label>
+                    <input
+                      type="number"
+                      id="ev-def"
+                      min="0"
+                      max="252"
+                      step="4"
+                      value="0"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>SpA:</label>
+                    <input
+                      type="number"
+                      id="ev-spa"
+                      min="0"
+                      max="252"
+                      step="4"
+                      value="0"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>SpD:</label>
+                    <input
+                      type="number"
+                      id="ev-spd"
+                      min="0"
+                      max="252"
+                      step="4"
+                      value="0"
+                    />
+                  </div>
+                  <div class="stat-input">
+                    <label>Spe:</label>
+                    <input
+                      type="number"
+                      id="ev-spe"
+                      min="0"
+                      max="252"
+                      step="4"
+                      value="0"
+                    />
+                  </div>
+                </div>
+                <p class="ev-total">
+                  Total EVs: <span id="ev-total">0</span>/510
+                </p>
+              </div>
+
+              <div class="form-section">
+                <h3>Moves</h3>
+                <div class="moves-inputs">
+                  <div class="form-group">
+                    <label for="move-1">Move 1:</label>
+                    <input
+                      type="text"
+                      id="move-1"
+                      placeholder="e.g., Flamethrower"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="move-2">Move 2:</label>
+                    <input
+                      type="text"
+                      id="move-2"
+                      placeholder="e.g., Thunderbolt"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="move-3">Move 3:</label>
+                    <input
+                      type="text"
+                      id="move-3"
+                      placeholder="e.g., Ice Beam"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="move-4">Move 4:</label>
+                    <input
+                      type="text"
+                      id="move-4"
+                      placeholder="e.g., Protect"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button id="save-customize-btn" class="save-btn">
+                Save Pokémon
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button id="start-battle" class="primary-button" disabled>
+          Start Battle
+        </button>
+      </div>
+
+      <!-- Battle Phase -->
+      <div id="battle-phase" class="phase">
+        <div class="battle-container">
+          <!-- Enemy Pokémon Display -->
+          <div class="pokemon-display enemy">
+            <div class="pokemon-info">
+              <h3 id="enemy-name">Enemy Pokémon</h3>
+              <div class="types" id="enemy-types"></div>
+              <div class="hp-bar-container">
+                <div class="hp-bar">
+                  <div class="hp-fill" id="enemy-hp-fill"></div>
+                </div>
+                <span class="hp-text" id="enemy-hp-text">100%</span>
+              </div>
+              <div class="status-display" id="enemy-status"></div>
+              <div class="stat-stages" id="enemy-stats"></div>
+            </div>
+            <div class="pokemon-sprite">
+              <img id="enemy-sprite" src="" alt="Enemy Pokémon" />
+            </div>
+          </div>
+
+          <!-- Battle Log -->
+          <div class="battle-log" id="battle-log">
+            <h3>Battle Log</h3>
+            <div class="log-content" id="log-content"></div>
+          </div>
+
+          <!-- Player Pokémon Display -->
+          <div class="pokemon-display player">
+            <div class="pokemon-sprite">
+              <img id="player-sprite" src="" alt="Your Pokémon" />
+            </div>
+            <div class="pokemon-info">
+              <h3 id="player-name">Your Pokémon</h3>
+              <div class="types" id="player-types"></div>
+              <div class="hp-bar-container">
+                <div class="hp-bar">
+                  <div class="hp-fill" id="player-hp-fill"></div>
+                </div>
+                <span class="hp-text" id="player-hp-text">100%</span>
+              </div>
+              <div class="status-display" id="player-status"></div>
+              <div class="stat-stages" id="player-stats"></div>
+            </div>
+          </div>
+
+          <!-- Action Selection -->
+          <div class="action-panel">
+            <h3>Your Move</h3>
+            <div class="action-buttons">
+              <div class="moves-section">
+                <h4>Moves</h4>
+                <div id="move-buttons" class="move-buttons"></div>
+              </div>
+              <div class="switch-section">
+                <h4>Switch</h4>
+                <div id="switch-buttons" class="switch-buttons"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Report -->
+        <div id="analysis-report" class="analysis-report hidden">
+          <h2>Move Analysis</h2>
+          <div class="report-content">
+            <div class="move-rating">
+              <span class="rating-badge" id="rating-badge">?</span>
+              <h3 id="rating-title">Analyzing...</h3>
+            </div>
+            <div class="analysis-details" id="analysis-details"></div>
+            <div class="alternatives" id="alternatives"></div>
+            <button id="continue-battle" class="primary-button">
+              Continue Battle
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="battle-engine/data/pokemon-fetcher.js"></script>
+    <script type="module" src="battle-engine/data/move-fetcher.js"></script>
+    <script type="module" src="move-analyzer.js"></script>
+  </body>
+</html>
