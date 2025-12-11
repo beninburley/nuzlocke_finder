@@ -44,6 +44,7 @@ app.get("/api/pokemon/:nameOrId", async (req, res) => {
         name: s.stat.name,
         value: s.base_stat,
       })),
+      moves: response.data.moves,
       sprite: response.data.sprites.front_default,
       spriteShiny: response.data.sprites.front_shiny,
     };

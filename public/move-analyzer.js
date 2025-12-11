@@ -127,7 +127,7 @@ function createPokemonOption(pokemon) {
   const option = document.createElement("div");
   option.className = "pokemon-option";
 
-  const sprite = pokemon.sprites?.front_default || "";
+  const sprite = pokemon.sprite || "";
   const name = pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1);
 
   option.innerHTML = `
@@ -151,10 +151,10 @@ function showCustomizePanel(pokemon) {
   const name = pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1);
   document.getElementById("customize-name").textContent = name;
   document.getElementById("customize-sprite").src =
-    pokemon.sprites?.front_default || "";
+    pokemon.sprite || "";
 
   // Set ability from Pokemon data
-  const ability = pokemon.abilities?.[0]?.ability?.name || "";
+  const ability = Array.isArray(pokemon.abilities) ? pokemon.abilities[0] : "";
   document.getElementById("customize-ability").value = ability;
 
   // Get first 4 moves from Pokemon
@@ -318,8 +318,8 @@ async function saveCustomizedPokemon() {
       specialDefense: 0,
       speed: 0,
     },
-    sprite: pokemon.sprites?.front_default || "",
-    backSprite: pokemon.sprites?.back_default || "",
+    sprite: pokemon.sprite || "",
+    backSprite: pokemon.sprite || "",
   };
 
   // Add to appropriate team
